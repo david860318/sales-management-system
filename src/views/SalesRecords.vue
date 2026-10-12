@@ -16,16 +16,17 @@
       <el-button type="success" :icon="Download" @click="exportCSV">匯出報表 (目前篩選結果)</el-button>
     </div>
 
-    <el-table :data="filteredTableData" style="width: 100%" border stripe>
+    <!-- 加入 cute-table 類別，統一文字顏色與粗細 -->
+    <el-table :data="filteredTableData" style="width: 100%" border class="cute-table">
       <el-table-column prop="month" label="歸屬月份" width="110" align="center" sortable />
       <el-table-column prop="clientName" label="客戶名稱" width="130" show-overflow-tooltip sortable />
       <el-table-column prop="projectName" label="專案名稱" width="150" show-overflow-tooltip />
       <el-table-column prop="clientType" label="屬性" width="100" align="center" sortable>
-        <template #default="scope"><el-tag :type="scope.row.clientType === '新客' ? 'primary' : 'success'">{{ scope.row.clientType }}</el-tag></template>
+        <template #default="scope"><el-tag :type="scope.row.clientType === '新客' ? 'primary' : 'success'" effect="light" round>{{ scope.row.clientType }}</el-tag></template>
       </el-table-column>
       <el-table-column prop="productName" label="產品名稱" width="120" show-overflow-tooltip />
       <el-table-column prop="status" label="狀態" width="150" align="center" sortable>
-        <template #default="scope"><el-tag :type="getStatusColor(scope.row.status)" effect="dark" size="small">{{ scope.row.status }}</el-tag></template>
+        <template #default="scope"><el-tag :type="getStatusColor(scope.row.status)" effect="dark" round size="small">{{ scope.row.status }}</el-tag></template>
       </el-table-column>
       <el-table-column prop="amount" label="合約金額(未稅)" align="right" width="140" sortable>
         <template #default="scope">$ {{ scope.row.amount.toLocaleString() }}</template>
@@ -33,15 +34,16 @@
       <el-table-column prop="cost" label="成本(實際付出)" align="right" width="140" sortable>
         <template #default="scope">$ {{ scope.row.cost.toLocaleString() }}</template>
       </el-table-column>
+      
+      <!-- 實際認列金額高亮 (草莓粉) -->
       <el-table-column prop="netRevenue" label="實際認列" align="right" width="130" sortable>
-        <template #default="scope"><strong style="color: #f56c6c;">$ {{ scope.row.netRevenue.toLocaleString() }}</strong></template>
+        <template #default="scope"><strong class="text-highlight-red">$ {{ scope.row.netRevenue.toLocaleString() }}</strong></template>
       </el-table-column>
+      
       <el-table-column prop="expectedDate" label="預計成交日" width="130" align="center" sortable />
       
-      <!-- 新增：雙用印狀態欄位 (打勾功能) -->
       <el-table-column label="雙用印" width="110" align="center" fixed="right">
         <template #default="scope">
-          <!-- 條件：金額大於 30 萬 且 狀態為 E輸單 -->
           <div v-if="scope.row.amount > 300000 && scope.row.status.includes('E輸單')">
             <el-checkbox v-model="scope.row.isDualSealCompleted" @change="(val) => updateDualSeal(scope.row, val)">
               <span :style="{ color: scope.row.isDualSealCompleted ? '#83cbb1' : '#f28b9c', fontWeight: 'bold' }">
@@ -154,7 +156,6 @@ const openEditDialog = (row) => { isEditMode.value = true; currentEditId.value =
 
 const handleDelete = (id) => { salesStore.deleteRecord(id); ElMessage.success('業績紀錄已刪除') }
 
-// 處理雙用印打勾狀態
 const updateDualSeal = (row, val) => {
   salesStore.updateRecord(row.id, { ...row, isDualSealCompleted: val })
   if (val) {
@@ -165,7 +166,6 @@ const updateDualSeal = (row, val) => {
 const submitForm = () => {
   if (!form.clientName || !form.month) return ElMessage.warning('請填寫客戶名稱與歸屬月份')
   
-  // 核心條件：合約金額超過 30 萬 且 狀態為 E輸單(已簽約) 且 尚未標記完成雙用印
   const isHighValueE = form.amount > 300000 && form.status.includes('E輸單')
   const needsReminder = isHighValueE && !form.isDualSealCompleted
 
@@ -179,18 +179,12 @@ const submitForm = () => {
   
   dialogVisible.value = false
 
-  // 若符合雙用印條件，彈出強烈提醒框
   if (needsReminder) {
     setTimeout(() => {
       ElMessageBox.alert(
         '此筆合約金額超過 30 萬，且已進入「E輸單(已簽約)」階段。<br/><br/>請務必記得進行<b>「雙用印」申請</b>！<br/><span style="color: #909399; font-size: 12px;">申請完畢後可在列表中打勾標記為完成。</span>',
         '⚠️ 雙用印申請提醒',
-        {
-          confirmButtonText: '我知道了',
-          type: 'warning',
-          dangerouslyUseHTMLString: true,
-          center: true
-        }
+        { confirmButtonText: '我知道了', type: 'warning', dangerouslyUseHTMLString: true, center: true }
       )
     }, 300)
   }
@@ -200,16 +194,12 @@ const resetForm = () => { Object.assign(form, defaultForm) }
 
 const exportCSV = () => {
   if (filteredTableData.value.length === 0) return ElMessage.warning('目前沒有紀錄可匯出')
-  
-  // 匯出報表同步新增「雙用印狀態」
   const headers = ['建檔日', '歸屬月份', '客戶屬性', '客戶名稱', '客戶產業', '專案名稱', '產品名稱', '業績來源', '推進狀態', '合約總金額(未稅)', '成本(外部)', '實際認列業績', '預計成交/收款日', '備註說明', '雙用印狀態']
   const rows = filteredTableData.value.map(r => {
-    // 判斷匯出文字
     let sealStatus = '無需'
     if (r.amount > 300000 && r.status.includes('E輸單')) {
       sealStatus = r.isDualSealCompleted ? '已完成' : '待申請'
     }
-    
     return [
       r.createdDate, r.month, r.clientType, r.clientName, r.industry || '', r.projectName || '', r.productName || '', r.source || '', r.status, r.amount, r.cost, r.netRevenue, r.expectedDate || '', (r.notes || '').replace(/,/g, '，'), sealStatus
     ]
@@ -235,9 +225,17 @@ const exportCSV = () => {
 .search-card :deep(.el-form-item) { margin-bottom: 0; margin-right: 15px; }
 .search-card :deep(.el-form-item__label) { color: #8cbbf1; font-weight: bold; }
 .toolbar { margin-bottom: 20px; }
+
+/* 統一表格文字與顏色優化 */
+.cute-table { color: #6b89a8; font-weight: 600; }
 :deep(.el-table) { border-radius: 16px; overflow: hidden; border: 2px solid #e7f5fe; }
 :deep(.el-table th.el-table__cell) { background-color: #e7f5fe; color: #6b89a8; font-weight: 800; }
 :deep(.el-table td.el-table__cell) { border-bottom: 1px dashed #e7f5fe; }
+:deep(.el-table tbody tr:hover > td.el-table__cell) { background-color: #f2f8fd !important; }
+
+/* 高亮文字色 (草莓粉) */
+.text-highlight-red { color: #f28b9c; font-weight: 900; }
+
 :deep(.el-dialog) { border-radius: 24px; }
 :deep(.el-dialog__header) { background-color: #f8fbff; border-radius: 24px 24px 0 0; border-bottom: 2px solid #e7f5fe; margin-right: 0; padding: 20px; }
 :deep(.el-dialog__title) { color: #6b89a8; font-weight: 800; }
