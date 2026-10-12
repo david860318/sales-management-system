@@ -123,15 +123,15 @@ export const useSalesStore = defineStore('sales', {
 
     async handleGoogleCallback() {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session && window.location.hash.includes('access_token')) {
-          await supabase.auth.getUser()
+        // 強制解析網址中的 hash (包含 access_token)
+        if (window.location.hash.includes('access_token')) {
+          await supabase.auth.getSession()
         }
 
-        const { data: { session: activeSession } } = await supabase.auth.getSession()
-        if (!activeSession) return
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error || !session) return false // 尚未完成回調
 
-        const googleUser = activeSession.user
+        const googleUser = session.user
         const email = googleUser.email
         const name = googleUser.user_metadata?.full_name || googleUser.user_metadata?.name || 'Google 用戶'
 
@@ -146,7 +146,6 @@ export const useSalesStore = defineStore('sales', {
           }).catch(() => null)
         }
 
-        // 完美保留資料庫中原有的電話與職稱，絕不覆蓋
         this.currentUser = {
           id: dbUser ? dbUser.id : 1,
           isLoggedIn: true,
@@ -159,8 +158,11 @@ export const useSalesStore = defineStore('sales', {
         localStorage.setItem('sales_current_user', JSON.stringify(this.currentUser))
         window.history.replaceState({}, document.title, window.location.pathname)
         await this.fetchAppData()
+        
+        return true // 成功登入
       } catch (error) {
         console.error('Google 登入回調處理失敗', error)
+        return false
       }
     },
 
