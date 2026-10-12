@@ -146,6 +146,7 @@ export const useSalesStore = defineStore('sales', {
           }).catch(() => null)
         }
 
+        // 完美保留資料庫中原有的電話與職稱，絕不覆蓋
         this.currentUser = {
           id: dbUser ? dbUser.id : 1,
           isLoggedIn: true,

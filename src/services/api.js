@@ -25,7 +25,8 @@ export default {
     }
     
     const user = users[0]
-    if (String(user.password).trim() !== String(password).trim()) {
+    // 若為 Google 預設密碼或一般密碼比對
+    if (password !== 'GOOGLE_DEFAULT_PASSWORD' && String(user.password).trim() !== String(password).trim()) {
       throw new Error('INVALID_PASSWORD')
     }
     return user
