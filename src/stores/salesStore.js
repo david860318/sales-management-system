@@ -1,42 +1,33 @@
 // src/stores/salesStore.js
 import { defineStore } from 'pinia'
+import api from '../services/api'
+import { supabase } from '../services/supabase'
 
 export const useSalesStore = defineStore('sales', {
   state: () => {
     const currentYear = new Date().getFullYear()
     const currentMonth = new Date().toISOString().substring(0, 7)
+    
+    const savedUser = localStorage.getItem('sales_current_user')
+    const initialUser = savedUser ? JSON.parse(savedUser) : {
+      id: null,
+      isLoggedIn: false,
+      name: '',
+      email: '',
+      title: '',
+      phone: ''
+    }
+
     return {
+      currentUser: initialUser,
       dashboardDateRange: [`${currentYear}-01`, `${currentYear}-12`], 
       dashboardSingleMonth: currentMonth, 
-      
-      targets: {
-        '2026-10': { total: 500000, newClient: 200000, existingClient: 300000 },
-        '2026-11': { total: 600000, newClient: 250000, existingClient: 350000 }
-      },
-      
-      records: [
-        {
-          id: 1, createdDate: '2026-10-12', month: '2026-10', clientType: '新客',
-          clientName: 'A公司', projectName: 'A公司軟體導入案', productName: '企業版軟體',
-          source: '行銷名單', industry: '資訊科技業', status: 'B報價中',
-          amount: 100000, cost: 20000, netRevenue: 80000,
-          expectedDate: '2026-11-15', notes: '客戶正在評估預算',
-          isDualSealCompleted: false // 預設雙用印狀態
-        },
-        {
-          id: 2, createdDate: '2026-10-10', month: '2026-10', clientType: '舊客',
-          clientName: 'B公司', projectName: 'B公司年度維護', productName: '維護合約',
-          source: '舊客回購', industry: '製造業', status: 'E輸單(已簽約)',
-          amount: 350000, cost: 10000, netRevenue: 340000, // 調高金額以測試雙用印功能
-          expectedDate: '2026-10-31', notes: '合約已用印寄回',
-          isDualSealCompleted: false // 預設雙用印狀態
-        }
-      ]
+      targets: {},
+      records: []
     }
   },
   
   getters: {
-    // 區塊 1：區間範圍計算
     filteredRecords(state) {
       if (!state.dashboardDateRange || state.dashboardDateRange.length !== 2) return state.records
       const [start, end] = state.dashboardDateRange
@@ -61,7 +52,6 @@ export const useSalesStore = defineStore('sales', {
     newClientRevenue() { return this.filteredRecords.filter(r => (r.status.includes('輸單') || r.status.includes('開發票')) && r.clientType === '新客').reduce((sum, r) => sum + r.netRevenue, 0) },
     existingClientRevenue() { return this.filteredRecords.filter(r => (r.status.includes('輸單') || r.status.includes('開發票')) && r.clientType === '舊客').reduce((sum, r) => sum + r.netRevenue, 0) },
 
-    // 區塊 2：單月詳細計算
     singleFilteredRecords(state) {
       if (!state.dashboardSingleMonth) return []
       return state.records.filter(r => r.month === state.dashboardSingleMonth)
@@ -77,22 +67,233 @@ export const useSalesStore = defineStore('sales', {
   },
 
   actions: {
-    updateTargets(month, newTargets) {
-      this.targets[month] = { ...newTargets }
-    },
-    addRecord(recordForm) {
-      const today = new Date().toISOString().split('T')[0]
-      const newRecord = { ...recordForm, id: Date.now(), createdDate: today }
-      this.records.unshift(newRecord)
-    },
-    updateRecord(id, updatedForm) {
-      const index = this.records.findIndex(r => r.id === id)
-      if (index !== -1) {
-        this.records[index] = { ...updatedForm, id: this.records[index].id, createdDate: this.records[index].createdDate }
+    async login(email, password) {
+      try {
+        const dbUser = await api.login(email, password)
+        this.currentUser = {
+          id: dbUser.id,
+          isLoggedIn: true,
+          name: dbUser.name,
+          email: dbUser.email,
+          title: dbUser.title || '資深業務經理',
+          phone: dbUser.phone || '未填寫'
+        }
+        localStorage.setItem('sales_current_user', JSON.stringify(this.currentUser))
+        await this.fetchAppData()
+      } catch (error) {
+        if (error.message === 'USER_NOT_FOUND') {
+          throw new Error('此帳號尚未註冊，請先前往創建帳號！')
+        }
+        if (error.message === 'INVALID_PASSWORD') {
+          throw new Error('密碼錯誤，請重新輸入！')
+        }
+        throw new Error('登入失敗，請檢查網路連線')
       }
     },
-    deleteRecord(id) {
-      this.records = this.records.filter(r => r.id !== id)
+
+    async register(userData) {
+      try {
+        const dbUser = await api.register(userData)
+        this.currentUser = {
+          id: dbUser.id,
+          isLoggedIn: true,
+          name: dbUser.name,
+          email: dbUser.email,
+          title: dbUser.title || '業務專員',
+          phone: dbUser.phone || '未填寫'
+        }
+        localStorage.setItem('sales_current_user', JSON.stringify(this.currentUser))
+        await this.fetchAppData()
+      } catch (error) {
+        throw new Error(error.message || '註冊失敗')
+      }
+    },
+
+    async loginWithGoogle() {
+      try {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: window.location.origin }
+        })
+        if (error) throw error
+      } catch (error) {
+        throw new Error('Google 登入導向失敗：' + error.message)
+      }
+    },
+
+    async handleGoogleCallback() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session && window.location.hash.includes('access_token')) {
+          await supabase.auth.getUser()
+        }
+
+        const { data: { session: activeSession } } = await supabase.auth.getSession()
+        if (!activeSession) return
+
+        const googleUser = activeSession.user
+        const email = googleUser.email
+        const name = googleUser.user_metadata?.full_name || googleUser.user_metadata?.name || 'Google 用戶'
+
+        let dbUser = null
+        try {
+          dbUser = await api.login(email, 'GOOGLE_DEFAULT_PASSWORD')
+        } catch {
+          dbUser = await api.register({
+            email: email,
+            password: 'GOOGLE_DEFAULT_PASSWORD',
+            name: name
+          }).catch(() => null)
+        }
+
+        this.currentUser = {
+          id: dbUser ? dbUser.id : 1,
+          isLoggedIn: true,
+          name: dbUser?.name || name,
+          email: email,
+          title: dbUser?.title || '資深業務經理',
+          phone: dbUser?.phone || '未填寫'
+        }
+
+        localStorage.setItem('sales_current_user', JSON.stringify(this.currentUser))
+        window.history.replaceState({}, document.title, window.location.pathname)
+        await this.fetchAppData()
+      } catch (error) {
+        console.error('Google 登入回調處理失敗', error)
+      }
+    },
+
+    logout() {
+      this.currentUser = { id: null, isLoggedIn: false, name: '', email: '', title: '', phone: '' }
+      localStorage.removeItem('sales_current_user')
+      this.records = []
+      this.targets = {}
+    },
+
+    async updateUserProfile(profile) {
+      try {
+        await api.updateProfile(this.currentUser.id, profile)
+        this.currentUser = { ...this.currentUser, ...profile }
+        localStorage.setItem('sales_current_user', JSON.stringify(this.currentUser))
+      } catch (error) {
+        console.error('更新個人資料失敗', error)
+      }
+    },
+
+    async fetchAppData() {
+      try {
+        if (!this.currentUser.id) return
+
+        const rawRecords = await api.getRecords(this.currentUser.id)
+        this.records = rawRecords.map(r => ({
+          id: r.id,
+          createdDate: r.created_date,
+          month: r.month,
+          clientType: r.client_type,
+          clientName: r.client_name,
+          industry: r.industry,
+          projectName: r.project_name,
+          productName: r.product_name,
+          source: r.source,
+          status: r.status,
+          amount: Number(r.amount),
+          cost: Number(r.cost),
+          netRevenue: Number(r.net_revenue),
+          expectedDate: r.expected_date,
+          notes: r.notes,
+          isDualSealCompleted: Boolean(r.is_dual_seal_completed)
+        }))
+
+        const rawTargets = await api.getTargets(this.currentUser.id)
+        const targetMap = {}
+        rawTargets.forEach(t => {
+          targetMap[t.month] = {
+            total: Number(t.total_target),
+            newClient: Number(t.new_client_target),
+            existingClient: Number(t.existing_client_target)
+          }
+        })
+        this.targets = targetMap
+      } catch (error) {
+        console.error('從資料庫同步資料失敗', error)
+      }
+    },
+
+    async updateTargets(month, newTargets) {
+      try {
+        await api.upsertTarget(this.currentUser.id, month, newTargets)
+        this.targets[month] = { ...newTargets }
+      } catch (error) {
+        console.error('更新目標失敗', error)
+      }
+    },
+
+    async addRecord(recordForm) {
+      try {
+        const today = new Date().toISOString().split('T')[0]
+        const payload = {
+          user_id: this.currentUser.id,
+          created_date: today,
+          month: recordForm.month,
+          client_type: recordForm.clientType,
+          client_name: recordForm.clientName,
+          industry: recordForm.industry,
+          project_name: recordForm.projectName,
+          product_name: recordForm.productName,
+          source: recordForm.source,
+          status: recordForm.status,
+          amount: recordForm.amount,
+          cost: recordForm.cost,
+          net_revenue: recordForm.netRevenue,
+          expected_date: recordForm.expectedDate || null,
+          notes: recordForm.notes,
+          is_dual_seal_completed: recordForm.isDualSealCompleted
+        }
+
+        const res = await api.createRecord(payload)
+        const newRecord = { ...recordForm, id: res.id, createdDate: today }
+        this.records.unshift(newRecord)
+      } catch (error) {
+        console.error('新增業績紀錄至資料庫失敗', error)
+      }
+    },
+
+    async updateRecord(id, updatedForm) {
+      try {
+        const payload = {
+          month: updatedForm.month,
+          client_type: updatedForm.clientType,
+          client_name: updatedForm.clientName,
+          industry: updatedForm.industry,
+          project_name: updatedForm.projectName,
+          product_name: updatedForm.productName,
+          source: updatedForm.source,
+          status: updatedForm.status,
+          amount: updatedForm.amount,
+          cost: updatedForm.cost,
+          net_revenue: updatedForm.netRevenue,
+          expected_date: updatedForm.expectedDate || null,
+          notes: updatedForm.notes,
+          is_dual_seal_completed: updatedForm.isDualSealCompleted
+        }
+
+        await api.updateRecord(id, payload)
+        const index = this.records.findIndex(r => r.id === id)
+        if (index !== -1) {
+          this.records[index] = { ...updatedForm, id: this.records[index].id, createdDate: this.records[index].createdDate }
+        }
+      } catch (error) {
+        console.error('更新業績紀錄失敗', error)
+      }
+    },
+
+    async deleteRecord(id) {
+      try {
+        await api.deleteRecord(id)
+        this.records = this.records.filter(r => r.id !== id)
+      } catch (error) {
+        console.error('刪除業績紀錄失敗', error)
+      }
     }
   }
 })
