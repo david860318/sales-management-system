@@ -70,9 +70,9 @@
                 <el-table-column label="總體業績" align="center">
                   <el-table-column label="總目標" align="right" min-width="110"><template #default="scope">$ {{ scope.row.targetTotal.toLocaleString() }}</template></el-table-column>
                   <el-table-column label="目前實際達成" align="right" min-width="120"><template #default="scope">$ {{ scope.row.actualTotal.toLocaleString() }}</template></el-table-column>
-                  <el-table-column label="實際達成率(E,F)" align="right" min-width="130"><template #default="scope"><el-tag :type="scope.row.actualRate >= 100 ? 'success' : 'warning'">{{ scope.row.actualRate }}%</el-tag></template></el-table-column>
-                  <el-table-column label="目前樂觀達成(D,E,F)" align="right" min-width="160"><template #default="scope"><span style="color: #409EFF; font-weight: bold;">$ {{ scope.row.optTotal.toLocaleString() }}</span></template></el-table-column>
-                  <el-table-column label="樂觀達成率(D,E,F)" align="right" min-width="150"><template #default="scope"><span style="color: #409EFF; font-weight: bold;">{{ scope.row.optRate }}%</span></template></el-table-column>
+                  <el-table-column label="實際達成率" align="right" min-width="130"><template #default="scope"><el-tag :type="scope.row.actualRate >= 100 ? 'success' : 'warning'">{{ scope.row.actualRate }}%</el-tag></template></el-table-column>
+                  <el-table-column label="目前樂觀達成" align="right" min-width="160"><template #default="scope"><span style="color: #409EFF; font-weight: bold;">$ {{ scope.row.optTotal.toLocaleString() }}</span></template></el-table-column>
+                  <el-table-column label="樂觀達成率" align="right" min-width="150"><template #default="scope"><span style="color: #409EFF; font-weight: bold;">{{ scope.row.optRate }}%</span></template></el-table-column>
                 </el-table-column>
 
                 <el-table-column label="新客業績" align="center">
@@ -173,9 +173,9 @@ const exportSummaryCSV = () => {
   
   // 更新 CSV 匯出的表頭與對應欄位 (依照新順序：實際金->實際率->樂觀金->樂觀率)
   const headers = [
-    '月份', '總目標', '目前實際達成', '實際達成率(E,F)', '目前樂觀達成(D,E,F)', '樂觀達成率(D,E,F)', 
-    '新客目標', '新客目前實際達成', '新客實際達成率(E,F)', '新客目前樂觀達成(D,E,F)', '新客樂觀達成率(D,E,F)',
-    '舊客目標', '舊客目前實際達成', '舊客實際達成率(E,F)', '舊客目前樂觀達成(D,E,F)', '舊客樂觀達成率(D,E,F)'
+    '月份', '總目標', '目前實際達成', '實際達成率', '目前樂觀達成', '樂觀達成率', 
+    '新客目標', '新客目前實際達成', '新客實際達成率', '新客目前樂觀達成', '新客樂觀達成率',
+    '舊客目標', '舊客目前實際達成', '舊客實際達成率', '舊客目前樂觀達成', '舊客樂觀達成率'
   ]
   const rows = rangeSummaryData.value.map(r => [
     r.month, r.targetTotal, r.actualTotal, `${r.actualRate}%`, r.optTotal, `${r.optRate}%`,
