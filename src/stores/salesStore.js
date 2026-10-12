@@ -20,14 +20,16 @@ export const useSalesStore = defineStore('sales', {
           clientName: 'A公司', projectName: 'A公司軟體導入案', productName: '企業版軟體',
           source: '行銷名單', industry: '資訊科技業', status: 'B報價中',
           amount: 100000, cost: 20000, netRevenue: 80000,
-          expectedDate: '2026-11-15', notes: '客戶正在評估預算'
+          expectedDate: '2026-11-15', notes: '客戶正在評估預算',
+          isDualSealCompleted: false // 預設雙用印狀態
         },
         {
           id: 2, createdDate: '2026-10-10', month: '2026-10', clientType: '舊客',
           clientName: 'B公司', projectName: 'B公司年度維護', productName: '維護合約',
           source: '舊客回購', industry: '製造業', status: 'E輸單(已簽約)',
-          amount: 150000, cost: 10000, netRevenue: 140000,
-          expectedDate: '2026-10-31', notes: '合約已用印寄回'
+          amount: 350000, cost: 10000, netRevenue: 340000, // 調高金額以測試雙用印功能
+          expectedDate: '2026-10-31', notes: '合約已用印寄回',
+          isDualSealCompleted: false // 預設雙用印狀態
         }
       ]
     }
@@ -86,7 +88,6 @@ export const useSalesStore = defineStore('sales', {
     updateRecord(id, updatedForm) {
       const index = this.records.findIndex(r => r.id === id)
       if (index !== -1) {
-        // 保留原有的 id 與 createdDate
         this.records[index] = { ...updatedForm, id: this.records[index].id, createdDate: this.records[index].createdDate }
       }
     },
