@@ -1,13 +1,30 @@
 <!-- src/views/SalesRecords.vue -->
 <template>
   <div class="records-container">
-    <!-- 搜尋篩選區 (點擊查詢後才過濾) -->
-    <el-card shadow="never" class="search-card" style="margin-bottom: 20px;">
-      <el-form :inline="true" :model="searchForm" class="demo-form-inline">
-        <el-form-item label="歸屬月份區間"><el-date-picker v-model="searchForm.dateRange" type="monthrange" range-separator="至" start-placeholder="開始月份" end-placeholder="結束月份" value-format="YYYY-MM" style="width: 250px" /></el-form-item>
-        <el-form-item label="客戶名稱"><el-input v-model="searchForm.clientName" placeholder="輸入關鍵字" clearable style="width: 150px" /></el-form-item>
-        <el-form-item label="屬性"><el-select v-model="searchForm.clientType" placeholder="全部" clearable style="width: 100px"><el-option label="新客" value="新客" /><el-option label="舊客" value="舊客" /></el-select></el-form-item>
-        <el-form-item label="狀態"><el-select v-model="searchForm.status" placeholder="全部" clearable style="width: 150px"><el-option label="A初步洽談" value="A初步洽談" /><el-option label="B報價中" value="B報價中" /><el-option label="E輸單(已簽約)" value="E輸單(已簽約)" /><el-option label="F開發票" value="F開發票" /><el-option label="G流單" value="G流單" /></el-select></el-form-item>
+    <!-- 搜尋條件卡片 -->
+    <el-card shadow="never" class="search-card" style="margin-bottom: 16px;">
+      <el-form :inline="true" :model="searchForm">
+        <el-form-item label="歸屬月份">
+          <el-date-picker v-model="searchForm.dateRange" type="monthrange" range-separator="至" start-placeholder="開始" end-placeholder="結束" value-format="YYYY-MM" />
+        </el-form-item>
+        <el-form-item label="客戶名稱">
+          <el-input v-model="searchForm.clientName" placeholder="搜尋客戶名稱" clearable />
+        </el-form-item>
+        <el-form-item label="屬性">
+          <el-select v-model="searchForm.clientType" placeholder="全部" clearable>
+            <el-option label="新客" value="新客" />
+            <el-option label="舊客" value="舊客" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="狀態">
+          <el-select v-model="searchForm.status" placeholder="全部" clearable>
+            <el-option label="A初步洽談" value="A初步洽談" />
+            <el-option label="B報價中" value="B報價中" />
+            <el-option label="E輸單(已簽約)" value="E輸單(已簽約)" />
+            <el-option label="F開發票" value="F開發票" />
+            <el-option label="G流單" value="G流單" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" :icon="Search" @click="handleSearch">查詢</el-button>
           <el-button @click="resetSearch">重置</el-button>
@@ -15,103 +32,137 @@
       </el-form>
     </el-card>
 
-    <div class="toolbar" style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+    <!-- 工具列（新增、匯出） -->
+    <div class="action-toolbar" style="display: flex; justify-content: space-between; margin-bottom: 16px;">
       <el-button type="primary" :icon="Plus" @click="openAddDialog">新增業績紀錄</el-button>
-      <el-button type="success" :icon="Download" @click="exportCSV">匯出報表 (目前篩選結果)</el-button>
+      <el-button type="success" :icon="Download" @click="exportCSV">匯出報表 (CSV)</el-button>
     </div>
 
-    <!-- 表格資料 (來自 Supabase) -->
-    <el-table :data="filteredTableData" style="width: 100%" border class="cute-table" v-loading="loading">
-      <el-table-column prop="month" label="歸屬月份" width="110" align="center" sortable />
-      <el-table-column prop="clientName" label="客戶名稱" width="130" show-overflow-tooltip sortable />
-      <el-table-column prop="projectName" label="專案名稱" width="150" show-overflow-tooltip />
-      <el-table-column prop="clientType" label="屬性" width="100" align="center" sortable>
-        <template #default="scope"><el-tag :type="scope.row.clientType === '新客' ? 'primary' : 'success'" effect="light" round>{{ scope.row.clientType }}</el-tag></template>
-      </el-table-column>
-      <el-table-column prop="productName" label="產品名稱" width="120" show-overflow-tooltip />
-      <el-table-column prop="status" label="狀態" width="150" align="center" sortable>
-        <template #default="scope"><el-tag :type="getStatusColor(scope.row.status)" effect="dark" round size="small">{{ scope.row.status }}</el-tag></template>
-      </el-table-column>
-      <el-table-column prop="amount" label="合約金額(未稅)" align="right" width="140" sortable>
-        <template #default="scope">$ {{ scope.row.amount.toLocaleString() }}</template>
-      </el-table-column>
-      <el-table-column prop="cost" label="成本(實際付出)" align="right" width="140" sortable>
-        <template #default="scope">$ {{ scope.row.cost.toLocaleString() }}</template>
-      </el-table-column>
-      <el-table-column prop="netRevenue" label="實際認列" align="right" width="130" sortable>
-        <template #default="scope"><strong class="text-highlight-red">$ {{ scope.row.netRevenue.toLocaleString() }}</strong></template>
-      </el-table-column>
-      <el-table-column prop="expectedDate" label="預計成交日" width="130" align="center" sortable />
-      
-      <!-- 雙用印即時同步 -->
-      <el-table-column label="雙用印" width="110" align="center" fixed="right">
-        <template #default="scope">
-          <div v-if="scope.row.amount > 300000 && scope.row.status.includes('E輸單')">
-            <el-checkbox v-model="scope.row.isDualSealCompleted" @change="(val) => updateDualSeal(scope.row, val)">
-              <span :style="{ color: scope.row.isDualSealCompleted ? '#83cbb1' : '#f28b9c', fontWeight: 'bold' }">
-                {{ scope.row.isDualSealCompleted ? '已完成' : '待申請' }}
-              </span>
-            </el-checkbox>
+    <!-- 桌機版：所有欄位皆支援 sortable 排序 (需求 6) -->
+    <div class="desktop-view-only">
+      <el-table :data="filteredTableData" border style="width: 100%" v-loading="loading">
+        <el-table-column prop="month" label="歸屬月份" width="105" align="center" sortable />
+        <el-table-column prop="clientName" label="客戶名稱" width="130" show-overflow-tooltip sortable />
+        <el-table-column prop="industry" label="產業類別" width="110" show-overflow-tooltip sortable />
+        <el-table-column prop="projectName" label="專案名稱" min-width="140" show-overflow-tooltip sortable />
+        <el-table-column prop="productName" label="產品名稱" width="120" show-overflow-tooltip sortable />
+        <el-table-column prop="source" label="商機來源" width="110" show-overflow-tooltip sortable />
+        <el-table-column prop="clientType" label="屬性" width="90" align="center" sortable>
+          <template #default="scope">
+            <el-tag :type="scope.row.clientType === '新客' ? 'primary' : 'success'" round size="small">{{ scope.row.clientType }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="狀態" width="130" align="center" sortable>
+          <template #default="scope">
+            <el-tag :type="getStatusColor(scope.row.status)" effect="dark" round size="small">{{ scope.row.status }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="amount" label="合約金額" align="right" width="120" sortable>
+          <template #default="scope">$ {{ scope.row.amount.toLocaleString() }}</template>
+        </el-table-column>
+        <el-table-column prop="cost" label="成本" align="right" width="110" sortable>
+          <template #default="scope">$ {{ scope.row.cost ? scope.row.cost.toLocaleString() : 0 }}</template>
+        </el-table-column>
+        <el-table-column prop="netRevenue" label="實際認列" align="right" width="125" sortable>
+          <template #default="scope"><strong style="color: #f28b9c;">$ {{ scope.row.netRevenue.toLocaleString() }}</strong></template>
+        </el-table-column>
+        <el-table-column prop="expectedDate" label="預計結案日" width="120" align="center" sortable />
+        <el-table-column prop="isDualSealCompleted" label="雙用印" width="100" align="center" sortable>
+          <template #default="scope">
+            <div v-if="scope.row.amount > 300000 && scope.row.status.includes('E輸單')">
+              <el-checkbox v-model="scope.row.isDualSealCompleted" @change="(val) => updateDualSeal(scope.row, val)">
+                <span :style="{ color: scope.row.isDualSealCompleted ? '#83cbb1' : '#f28b9c', fontWeight: 'bold' }">
+                  {{ scope.row.isDualSealCompleted ? '已完成' : '待申請' }}
+                </span>
+              </el-checkbox>
+            </div>
+            <span v-else style="color: #a1b5c9; font-size: 12px;">無需</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" align="center" fixed="right">
+          <template #default="scope">
+            <el-button type="primary" link size="small" @click="openEditDialog(scope.row)">編輯</el-button>
+            <el-popconfirm title="確定要刪除這筆紀錄嗎？" @confirm="handleDelete(scope.row.id)">
+              <template #reference><el-button type="danger" link size="small">刪除</el-button></template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <!-- 手機版：卡片清單 -->
+    <div class="mobile-view-only" v-loading="loading">
+      <div v-if="filteredTableData.length === 0" style="text-align: center; color: #a1b5c9; padding: 24px;">暫無業績紀錄</div>
+      <div v-for="item in filteredTableData" :key="item.id" class="mobile-record-card">
+        <div class="m-head">
+          <span class="m-month">📅 {{ item.month }}</span>
+          <div class="m-tags">
+            <el-tag :type="item.clientType === '新客' ? 'primary' : 'success'" size="small">{{ item.clientType }}</el-tag>
+            <el-tag :type="getStatusColor(item.status)" effect="dark" size="small">{{ item.status }}</el-tag>
           </div>
-          <span v-else style="color: #a1b5c9; font-size: 12px;">無需</span>
-        </template>
-      </el-table-column>
+        </div>
 
-      <el-table-column label="操作" width="120" align="center" fixed="right">
-        <template #default="scope">
-          <el-button type="primary" link size="small" @click="openEditDialog(scope.row)">編輯</el-button>
-          <el-popconfirm title="確定要刪除這筆業績嗎？" @confirm="handleDelete(scope.row.id)">
-            <template #reference><el-button type="danger" link size="small">刪除</el-button></template>
+        <div class="m-body">
+          <h4 class="m-client">{{ item.clientName }}</h4>
+          <p class="m-desc">專案：{{ item.projectName || '未填寫' }}</p>
+          <p class="m-desc" v-if="item.productName">產品：{{ item.productName }}</p>
+
+          <div class="m-revenue-box">
+            <span>實際認列：</span>
+            <strong class="revenue-val">$ {{ item.netRevenue.toLocaleString() }}</strong>
+          </div>
+
+          <div class="m-meta-row">
+            <span>合約：${{ item.amount.toLocaleString() }}</span>
+            <span v-if="item.cost">成本：${{ item.cost.toLocaleString() }}</span>
+          </div>
+        </div>
+
+        <div class="m-dual-row" v-if="item.amount > 300000 && item.status.includes('E輸單')">
+          <el-checkbox v-model="item.isDualSealCompleted" @change="(val) => updateDualSeal(item, val)">
+            雙用印：{{ item.isDualSealCompleted ? '已完成' : '待申請' }}
+          </el-checkbox>
+        </div>
+
+        <div class="m-footer">
+          <el-button type="primary" size="small" plain @click="openEditDialog(item)">編輯</el-button>
+          <el-popconfirm title="確定刪除此紀錄？" @confirm="handleDelete(item.id)">
+            <template #reference><el-button type="danger" size="small" plain>刪除</el-button></template>
           </el-popconfirm>
-        </template>
-      </el-table-column>
-    </el-table>
+        </div>
+      </div>
+    </div>
 
-    <!-- 新增/編輯彈窗 -->
-    <el-dialog v-model="dialogVisible" :title="isEditMode ? '編輯業績紀錄' : '新增業績紀錄'" width="600px" @closed="resetForm">
-      <el-form :model="form" label-width="120px">
-        <el-divider content-position="left">基本與專案資訊</el-divider>
-        <el-form-item label="業績歸屬月份"><el-date-picker v-model="form.month" type="month" value-format="YYYY-MM" style="width: 100%" /></el-form-item>
+    <!-- 新增 / 編輯對話框 -->
+    <el-dialog v-model="dialogVisible" :title="isEditMode ? '編輯業績紀錄' : '新增業績紀錄'" @closed="resetForm">
+      <el-form :model="form" label-width="110px">
+        <el-form-item label="歸屬月份"><el-date-picker v-model="form.month" type="month" value-format="YYYY-MM" style="width: 100%" /></el-form-item>
         <el-form-item label="客戶屬性">
-          <el-radio-group v-model="form.clientType"><el-radio value="新客" label="新客">新客</el-radio><el-radio value="舊客" label="舊客">舊客</el-radio></el-radio-group>
+          <el-radio-group v-model="form.clientType"><el-radio value="新客">新客</el-radio><el-radio value="舊客">舊客</el-radio></el-radio-group>
         </el-form-item>
-        <el-form-item label="客戶名稱"><el-input v-model="form.clientName" placeholder="輸入客戶公司名稱" /></el-form-item>
-        <el-form-item label="客戶產業"><el-input v-model="form.industry" placeholder="輸入客戶產業" /></el-form-item>
+        <el-form-item label="客戶名稱"><el-input v-model="form.clientName" placeholder="輸入客戶名稱" /></el-form-item>
+        <el-form-item label="產業類別"><el-input v-model="form.industry" placeholder="輸入產業類別" /></el-form-item>
         <el-form-item label="專案名稱"><el-input v-model="form.projectName" placeholder="輸入專案名稱" /></el-form-item>
         <el-form-item label="產品名稱"><el-input v-model="form.productName" placeholder="輸入產品名稱" /></el-form-item>
-        <el-form-item label="業績來源">
-          <el-select v-model="form.source" placeholder="選擇開發管道" style="width: 100%">
-            <el-option label="陌生開發" value="陌生開發" /><el-option label="舊客回購" value="舊客回購" /><el-option label="行銷名單" value="行銷名單" /><el-option label="合作夥伴轉介" value="合作夥伴轉介" />
-          </el-select>
-        </el-form-item>
-
-        <el-divider content-position="left">金額與狀態</el-divider>
-        <el-form-item label="推進階段/狀態">
+        <el-form-item label="商機來源"><el-input v-model="form.source" placeholder="例如：官網名單、轉介紹" /></el-form-item>
+        <el-form-item label="推進狀態">
           <el-select v-model="form.status" style="width: 100%">
-            <el-option-group label="商機階段"><el-option label="A初步洽談" value="A初步洽談" /><el-option label="B報價中" value="B報價中" /><el-option label="C調整報價" value="C調整報價" /><el-option label="D提供合約" value="D提供合約" /></el-option-group>
-            <el-option-group label="結案階段"><el-option label="E輸單(已簽約)" value="E輸單(已簽約)" /><el-option label="F開發票" value="F開發票" /></el-option-group>
-            <el-option-group label="失效階段"><el-option label="G流單" value="G流單" /></el-option-group>
+            <el-option label="A初步洽談" value="A初步洽談" />
+            <el-option label="B報價中" value="B報價中" />
+            <el-option label="E輸單(已簽約)" value="E輸單(已簽約)" />
+            <el-option label="F開發票" value="F開發票" />
+            <el-option label="G流單" value="G流單" />
           </el-select>
         </el-form-item>
-        
-        <el-form-item label="合約總金額">
-          <el-input-number v-model="form.amount" :min="0" :step="10000" style="width: 100%" @change="autoCalculateNet" />
-        </el-form-item>
-        <el-form-item label="成本(外部費用)">
-          <el-input-number v-model="form.cost" :min="0" :step="1000" style="width: 100%" @change="autoCalculateNet" />
-        </el-form-item>
-        <el-form-item label="實際認列業績">
-          <el-input-number v-model="form.netRevenue" :min="0" :step="10000" style="width: 100%" />
-        </el-form-item>
-
-        <el-divider content-position="left">其他</el-divider>
-        <el-form-item label="預計成交/收款日"><el-date-picker v-model="form.expectedDate" type="date" placeholder="選擇日期" value-format="YYYY-MM-DD" style="width: 100%" /></el-form-item>
-        <el-form-item label="備註說明"><el-input v-model="form.notes" type="textarea" :rows="3" placeholder="其他補充事項..." /></el-form-item>
+        <el-form-item label="合約總額"><el-input-number v-model="form.amount" :min="0" :step="10000" style="width: 100%" @change="autoCalculateNet" /></el-form-item>
+        <el-form-item label="成本金額"><el-input-number v-model="form.cost" :min="0" :step="1000" style="width: 100%" @change="autoCalculateNet" /></el-form-item>
+        <el-form-item label="實際認列"><el-input-number v-model="form.netRevenue" :min="0" :step="10000" style="width: 100%" /></el-form-item>
+        <el-form-item label="預計結案日"><el-date-picker v-model="form.expectedDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" /></el-form-item>
+        <el-form-item label="備註說明"><el-input v-model="form.notes" type="textarea" :rows="2" placeholder="填寫專案備註..." /></el-form-item>
       </el-form>
-      
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="submitForm">{{ isEditMode ? '儲存變更' : '確認新增' }}</el-button>
+        <el-button type="primary" :loading="submitting" @click="submitForm">確認儲存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -119,11 +170,14 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { Plus, Download, Search } from '@element-plus/icons-vue'
 import { useSalesStore } from '../stores/salesStore'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 
 const salesStore = useSalesStore()
+const route = useRoute()
+
 const loading = ref(false)
 const submitting = ref(false)
 const dialogVisible = ref(false)
@@ -133,10 +187,32 @@ const currentEditId = ref(null)
 const searchForm = reactive({ dateRange: [], clientName: '', clientType: '', status: '' })
 const appliedSearch = reactive({ dateRange: [], clientName: '', clientType: '', status: '' })
 
-const defaultForm = { month: '', clientType: '新客', clientName: '', industry: '', projectName: '', productName: '', source: '', status: 'A初步洽談', amount: 0, cost: 0, netRevenue: 0, expectedDate: '', notes: '', isDualSealCompleted: false }
+const defaultForm = {
+  month: '',
+  clientType: '新客',
+  clientName: '',
+  industry: '',
+  projectName: '',
+  productName: '',
+  source: '',
+  status: 'A初步洽談',
+  amount: 0,
+  cost: 0,
+  netRevenue: 0,
+  expectedDate: null,
+  notes: '',
+  isDualSealCompleted: false
+}
 const form = reactive({ ...defaultForm })
 
 onMounted(async () => {
+  // 需求 4: 檢查是否有傳入 month 參數，有則自動篩選該月份
+  if (route.query.month) {
+    const targetMonth = String(route.query.month)
+    searchForm.dateRange = [targetMonth, targetMonth]
+    appliedSearch.dateRange = [targetMonth, targetMonth]
+  }
+
   loading.value = true
   await salesStore.fetchAppData()
   loading.value = false
@@ -147,19 +223,14 @@ const handleSearch = () => {
   appliedSearch.clientName = searchForm.clientName
   appliedSearch.clientType = searchForm.clientType
   appliedSearch.status = searchForm.status
-  ElMessage.success('已載入篩選結果！')
 }
 
-const resetSearch = () => { 
+const resetSearch = () => {
   searchForm.dateRange = []
   searchForm.clientName = ''
   searchForm.clientType = ''
   searchForm.status = ''
-  appliedSearch.dateRange = []
-  appliedSearch.clientName = ''
-  appliedSearch.clientType = ''
-  appliedSearch.status = ''
-  ElMessage.info('已重置篩選條件')
+  handleSearch()
 }
 
 const filteredTableData = computed(() => {
@@ -178,70 +249,104 @@ const getStatusColor = (status) => {
   return 'warning'
 }
 
-const autoCalculateNet = () => { form.netRevenue = form.amount - form.cost }
+const autoCalculateNet = () => {
+  form.netRevenue = (Number(form.amount) || 0) - (Number(form.cost) || 0)
+}
 
-const openAddDialog = () => { isEditMode.value = false; Object.assign(form, defaultForm); dialogVisible.value = true }
-const openEditDialog = (row) => { isEditMode.value = true; currentEditId.value = row.id; Object.assign(form, row); dialogVisible.value = true }
+const openAddDialog = () => {
+  isEditMode.value = false
+  Object.assign(form, defaultForm)
+  dialogVisible.value = true
+}
+
+const openEditDialog = (row) => {
+  isEditMode.value = true
+  currentEditId.value = row.id
+  Object.assign(form, row)
+  dialogVisible.value = true
+}
 
 const handleDelete = async (id) => {
-  loading.value = true
   await salesStore.deleteRecord(id)
-  loading.value = false
-  ElMessage.success('業績紀錄已從資料庫刪除')
+  ElMessage.success('已刪除紀錄')
 }
 
 const updateDualSeal = async (row, val) => {
   await salesStore.updateRecord(row.id, { ...row, isDualSealCompleted: val })
-  if (val) ElMessage.success('雙用印狀態已同步至資料庫！')
 }
 
 const submitForm = async () => {
   if (!form.clientName || !form.month) return ElMessage.warning('請填寫客戶名稱與歸屬月份')
-  
   submitting.value = true
   if (isEditMode.value) {
     await salesStore.updateRecord(currentEditId.value, { ...form })
-    ElMessage.success('業績紀錄已更新至資料庫！')
   } else {
     await salesStore.addRecord({ ...form })
-    ElMessage.success('業績成功新增至資料庫！')
   }
   submitting.value = false
   dialogVisible.value = false
+  ElMessage.success('業績紀錄已成功儲存！')
 }
 
-const resetForm = () => { Object.assign(form, defaultForm) }
+const resetForm = () => {
+  Object.assign(form, defaultForm)
+}
 
 const exportCSV = () => {
-  if (filteredTableData.value.length === 0) return ElMessage.warning('目前沒有紀錄可匯出')
-  const headers = ['建檔日', '歸屬月份', '客戶屬性', '客戶名稱', '客戶產業', '專案名稱', '產品名稱', '業績來源', '推進狀態', '合約總金額(未稅)', '成本', '實際認列', '預計成交日', '備註', '雙用印']
+  if (filteredTableData.value.length === 0) return ElMessage.warning('無資料可匯出')
+  const headers = ['歸屬月份', '客戶名稱', '產業類別', '專案名稱', '產品名稱', '商機來源', '客戶屬性', '狀態', '合約金額', '成本', '實際認列', '預計結案日', '雙用印完成']
   const rows = filteredTableData.value.map(r => [
-    r.createdDate, r.month, r.clientType, r.clientName, r.industry || '', r.projectName || '', r.productName || '', r.source || '', r.status, r.amount, r.cost, r.netRevenue, r.expectedDate || '', (r.notes || '').replace(/,/g, '，'), r.isDualSealCompleted ? '已完成' : '待申請'
+    r.month,
+    r.clientName,
+    r.industry || '',
+    r.projectName || '',
+    r.productName || '',
+    r.source || '',
+    r.clientType,
+    r.status,
+    r.amount,
+    r.cost,
+    r.netRevenue,
+    r.expectedDate || '',
+    r.isDualSealCompleted ? '是' : '否'
   ])
-  
-  let csvContent = '\uFEFF' + headers.join(',') + '\n'
-  rows.forEach(row => { csvContent += row.join(',') + '\n' })
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const link = document.createElement('a')
-  link.setAttribute('href', URL.createObjectURL(blob))
-  link.setAttribute('download', `業績報表_${new Date().toISOString().split('T')[0]}.csv`)
-  link.style.visibility = 'hidden'
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  ElMessage.success('報表下載成功！')
+  let csv = '\uFEFF' + headers.join(',') + '\n' + rows.map(e => e.join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `業績報表_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
 }
 </script>
 
 <style scoped>
-.records-container { background-color: #fff; padding: 24px; border-radius: 24px; box-shadow: 0 8px 24px rgba(140, 187, 241, 0.12); }
-.search-card { background-color: #f8fbff; border: 2px dashed #d0e8fc; border-radius: 20px;}
-.search-card :deep(.el-form-item) { margin-bottom: 0; margin-right: 15px; }
-.search-card :deep(.el-form-item__label) { color: #8cbbf1; font-weight: bold; }
-.cute-table { color: #6b89a8; font-weight: 600; }
-:deep(.el-table) { border-radius: 16px; overflow: hidden; border: 2px solid #e7f5fe; }
-:deep(.el-table th.el-table__cell) { background-color: #e7f5fe; color: #6b89a8; font-weight: 800; }
-:deep(.el-table td.el-table__cell) { border-bottom: 1px dashed #e7f5fe; }
-:deep(.el-table tbody tr:hover > td.el-table__cell) { background-color: #f2f8fd !important; }
-.text-highlight-red { color: #f28b9c; font-weight: 900; }
+.records-container { width: 100%; }
+
+.mobile-record-card {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 14px;
+  border: 1px solid #e7f5fe;
+  box-shadow: 0 2px 10px rgba(140, 187, 241, 0.08);
+}
+.m-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.m-month { font-size: 13px; font-weight: bold; color: #518de1; }
+.m-tags { display: flex; gap: 6px; }
+.m-client { margin: 0 0 4px 0; font-size: 17px; color: #334e68; }
+.m-desc { margin: 0 0 4px 0; font-size: 13px; color: #8fa4bc; }
+.m-revenue-box {
+  background: #f8fbff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  margin: 8px 0;
+}
+.revenue-val { color: #f28b9c; font-size: 18px; }
+.m-meta-row { display: flex; gap: 15px; font-size: 12px; color: #a1b5c9; }
+.m-dual-row { padding: 8px 0; border-top: 1px dashed #f0f7ff; margin-top: 8px; }
+.m-footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 8px; border-top: 1px solid #f8fbff; }
 </style>

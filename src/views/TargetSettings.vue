@@ -1,53 +1,79 @@
 <!-- src/views/TargetSettings.vue -->
 <template>
-  <div class="settings-container">
-    <el-card shadow="hover" class="settings-card">
+  <div class="target-wrapper">
+    <el-card shadow="hover" class="target-card">
       <template #header>
-        <div class="card-header">
-          <span>🎯 {{ salesStore.currentUser.name }} 的每月業績目標設定</span>
-          <el-button type="primary" size="small" @click="openAddTargetDialog">新增月份目標</el-button>
+        <div class="target-header">
+          <span>🎯 {{ salesStore.currentUser.name }} 的業績目標設定</span>
+          <el-button type="primary" size="small" @click="openAddDialog">新增月份目標</el-button>
         </div>
       </template>
 
-      <el-table :data="targetTableData" style="width: 100%" border class="cute-table">
-        <el-table-column prop="month" label="月份" width="120" align="center" sortable>
-          <template #default="scope"><strong>{{ scope.row.month }}</strong></template>
-        </el-table-column>
-        <el-table-column prop="total" label="總目標業績" align="right" sortable>
-          <template #default="scope">$ {{ scope.row.total.toLocaleString() }}</template>
-        </el-table-column>
-        <el-table-column prop="newClient" label="新客目標業績" align="right" sortable>
-          <template #default="scope"><span class="text-opt-blue">$ {{ scope.row.newClient.toLocaleString() }}</span></template>
-        </el-table-column>
-        <el-table-column prop="existingClient" label="舊客目標業績" align="right" sortable>
-          <template #default="scope"><span class="text-opt-green">$ {{ scope.row.existingClient.toLocaleString() }}</span></template>
-        </el-table-column>
-        <el-table-column label="操作" width="150" align="center" fixed="right">
-          <template #default="scope">
-            <el-button type="primary" link size="small" @click="openEditTargetDialog(scope.row)">編輯目標</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <!-- 需求 7: 月份搜尋篩選列 -->
+      <div class="filter-bar">
+        <span class="filter-label">🔍 篩選目標月份：</span>
+        <el-date-picker
+          v-model="filterMonth"
+          type="month"
+          value-format="YYYY-MM"
+          placeholder="選擇月份或清空看全部"
+          clearable
+          style="width: 200px;"
+        />
+        <el-button v-if="filterMonth" size="small" @click="filterMonth = ''" style="margin-left: 8px;">重置</el-button>
+      </div>
+
+      <!-- 1. 桌機版表格 -->
+      <div class="desktop-target-view">
+        <el-table :data="tableData" border style="width: 100%">
+          <el-table-column prop="month" label="月份" width="110" align="center" sortable />
+          <el-table-column prop="total" label="總目標業績" align="right" sortable>
+            <template #default="scope">$ {{ scope.row.total.toLocaleString() }}</template>
+          </el-table-column>
+          <el-table-column prop="newClient" label="新客目標" align="right" sortable>
+            <template #default="scope"><span style="color: #518de1; font-weight: bold;">$ {{ scope.row.newClient.toLocaleString() }}</span></template>
+          </el-table-column>
+          <el-table-column prop="existingClient" label="舊客目標" align="right" sortable>
+            <template #default="scope"><span style="color: #4ab382; font-weight: bold;">$ {{ scope.row.existingClient.toLocaleString() }}</span></template>
+          </el-table-column>
+          <el-table-column label="操作" width="100" align="center">
+            <template #default="scope">
+              <el-button type="primary" link size="small" @click="openEditDialog(scope.row)">編輯</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <!-- 2. 手機版卡片清單 -->
+      <div class="mobile-target-view">
+        <div v-if="tableData.length === 0" class="empty-hint">尚未設定任何月份目標</div>
+        <div v-for="item in tableData" :key="item.month" class="m-t-card">
+          <div class="m-t-head">
+            <span class="m-t-month">📅 {{ item.month }}</span>
+            <el-button type="primary" size="small" plain @click="openEditDialog(item)">編輯</el-button>
+          </div>
+          <div class="m-t-rows">
+            <div class="m-t-row"><span>總目標：</span><strong>$ {{ item.total.toLocaleString() }}</strong></div>
+            <div class="m-t-row"><span>新客目標：</span><span style="color: #518de1;">$ {{ item.newClient.toLocaleString() }}</span></div>
+            <div class="m-t-row"><span>舊客目標：</span><span style="color: #4ab382;">$ {{ item.existingClient.toLocaleString() }}</span></div>
+          </div>
+        </div>
+      </div>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="isEditMode ? '修改月份業績目標' : '新增月份業績目標'" width="500px">
-      <el-form :model="form" label-width="120px">
+    <!-- 對話框 -->
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '修改月份業績目標' : '新增月份業績目標'">
+      <el-form :model="form" label-width="110px">
         <el-form-item label="目標月份">
-          <el-date-picker v-model="form.month" type="month" value-format="YYYY-MM" placeholder="選擇月份" :disabled="isEditMode" style="width: 100%" />
+          <el-date-picker v-model="form.month" type="month" value-format="YYYY-MM" :disabled="isEdit" style="width: 100%;" />
         </el-form-item>
-        <el-form-item label="總目標金額">
-          <el-input-number v-model="form.total" :min="0" :step="50000" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="新客目標金額">
-          <el-input-number v-model="form.newClient" :min="0" :step="10000" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="舊客目標金額">
-          <el-input-number v-model="form.existingClient" :min="0" :step="10000" style="width: 100%" />
-        </el-form-item>
+        <el-form-item label="總目標金額"><el-input-number v-model="form.total" :min="0" :step="50000" style="width: 100%;" /></el-form-item>
+        <el-form-item label="新客目標金額"><el-input-number v-model="form.newClient" :min="0" :step="10000" style="width: 100%;" /></el-form-item>
+        <el-form-item label="舊客目標金額"><el-input-number v-model="form.existingClient" :min="0" :step="10000" style="width: 100%;" /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitTargetForm">確認儲存</el-button>
+        <el-button type="primary" @click="saveTarget">確認儲存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -60,28 +86,33 @@ import { ElMessage } from 'element-plus'
 
 const salesStore = useSalesStore()
 const dialogVisible = ref(false)
-const isEditMode = ref(false)
-
+const isEdit = ref(false)
+const filterMonth = ref('') // 需求 7: 篩選月份
 const form = reactive({ month: '', total: 0, newClient: 0, existingClient: 0 })
 
-const targetTableData = computed(() => {
-  return Object.keys(salesStore.targets).sort().map(month => ({
+// 依篩選月份過濾列表
+const tableData = computed(() => {
+  let months = Object.keys(salesStore.targets).sort()
+  if (filterMonth.value) {
+    months = months.filter(m => m === filterMonth.value)
+  }
+  return months.map(month => ({
     month,
     ...salesStore.targets[month]
   }))
 })
 
-const openAddTargetDialog = () => {
-  isEditMode.value = false
-  form.month = new Date().toISOString().substring(0, 7)
+const openAddDialog = () => {
+  isEdit.value = false
+  form.month = new Date().toISOString().slice(0, 7)
   form.total = 500000
   form.newClient = 200000
   form.existingClient = 300000
   dialogVisible.value = true
 }
 
-const openEditTargetDialog = (row) => {
-  isEditMode.value = true
+const openEditDialog = (row) => {
+  isEdit.value = true
   form.month = row.month
   form.total = row.total
   form.newClient = row.newClient
@@ -89,28 +120,73 @@ const openEditTargetDialog = (row) => {
   dialogVisible.value = true
 }
 
-const submitTargetForm = async () => {
-  if (!form.month) return ElMessage.warning('請選擇月份')
-  
+// 需求 7: 儲存與防呆檢查
+const saveTarget = async () => {
+  if (!form.month) return ElMessage.warning('請選擇目標月份')
+
+  // 防呆：如果是在「新增模式」，檢查該月份是否已經存在
+  if (!isEdit.value && salesStore.targets[form.month]) {
+    ElMessage.error(`【警告】月份 ${form.month} 的目標已經存在！請直接從列表中點擊「編輯」進行修改。`)
+    return
+  }
+
   await salesStore.updateTargets(form.month, {
     total: form.total,
     newClient: form.newClient,
     existingClient: form.existingClient
   })
-
-  ElMessage.success(`月份 ${form.month} 目標已成功儲存至您的帳號！`)
+  ElMessage.success(`月份 ${form.month} 目標已成功儲存`)
   dialogVisible.value = false
 }
 </script>
 
 <style scoped>
-.settings-container { padding: 10px; }
-.settings-card { border-radius: 24px; border: none; box-shadow: 0 6px 18px rgba(140, 187, 241, 0.1) !important; }
-.card-header { font-weight: 800; font-size: 16px; color: #6b89a8; display: flex; justify-content: space-between; align-items: center; }
-.cute-table { color: #6b89a8; font-weight: 600; }
-:deep(.el-table) { border-radius: 16px; overflow: hidden; border: 2px solid #e7f5fe; }
-:deep(.el-table th.el-table__cell) { background-color: #e7f5fe; color: #6b89a8; font-weight: 800; }
-:deep(.el-table td.el-table__cell) { border-bottom: 1px dashed #e7f5fe; }
-.text-opt-blue { color: #518de1; font-weight: bold; }
-.text-opt-green { color: #4ab382; font-weight: bold; }
+.target-wrapper { width: 100%; }
+.target-card { border-radius: 14px; }
+.target-header { display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: #4a6583; }
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  background-color: #f8fbff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px dashed #e7f5fe;
+}
+.filter-label {
+  font-size: 14px;
+  font-weight: bold;
+  color: #6b89a8;
+  margin-right: 8px;
+}
+
+.desktop-target-view { display: block; }
+.mobile-target-view { display: none; }
+
+@media screen and (max-width: 768px) {
+  .desktop-target-view { display: none; }
+  .mobile-target-view { display: flex; flex-direction: column; gap: 10px; }
+
+  .filter-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .filter-bar :deep(.el-date-editor) {
+    width: 100% !important;
+  }
+
+  .m-t-card {
+    background: #ffffff;
+    border: 1px solid #e7f5fe;
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .m-t-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .m-t-month { font-weight: bold; color: #4a6583; }
+  .m-t-rows { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .m-t-row { display: flex; justify-content: space-between; background: #f8fbff; padding: 6px 10px; border-radius: 6px; }
+  .empty-hint { text-align: center; color: #a1b5c9; padding: 20px; }
+}
 </style>

@@ -1,0 +1,90 @@
+/* src/assets/rwd.css */
+
+/* ==========================================================
+   桌機版 (寬度 > 768px)：完全保持原生，不做額外覆蓋
+   ========================================================== */
+
+/* 提供切換類別：桌機顯示 / 手機顯示 */
+.desktop-view-only {
+  display: block;
+}
+.mobile-view-only {
+  display: none;
+}
+
+/* ==========================================================
+   手機與平板版 (寬度 <= 768px)：專屬排版優化
+   ========================================================== */
+@media screen and (max-width: 768px) {
+  /* 視圖切換 */
+  .desktop-view-only {
+    display: none !important;
+  }
+  .mobile-view-only {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* 1. 彈窗 Dialog 自動貼合手機螢幕，避免破版 */
+  .el-dialog {
+    width: 92% !important;
+    max-width: 92% !important;
+    margin: 20px auto !important;
+    border-radius: 16px !important;
+  }
+
+  .el-dialog__body {
+    padding: 14px !important;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  /* 2. 彈窗內的表單在手機上直向排列，避免 label 被擠扁 */
+  .el-dialog .el-form-item {
+    display: flex;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    margin-bottom: 12px !important;
+  }
+
+  .el-dialog .el-form-item__label {
+    text-align: left !important;
+    margin-bottom: 4px !important;
+    padding: 0 !important;
+    line-height: 1.3 !important;
+  }
+
+  .el-dialog .el-form-item__content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  /* 3. 搜尋列在手機上直向堆疊 */
+  .search-card .el-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .search-card .el-form-item {
+    margin-right: 0 !important;
+    margin-bottom: 0 !important;
+    width: 100% !important;
+  }
+
+  .search-card .el-form-item__content {
+    width: 100% !important;
+  }
+
+  /* 4. 操作按鈕（新增、匯出）在手機上垂直滿版好點擊 */
+  .action-toolbar {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .action-toolbar .el-button {
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
+}
