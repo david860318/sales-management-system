@@ -1,10 +1,13 @@
 /* ==========================================================
-   SPM 系統 - 寶寶藍可愛風 (Baby Blue Cute Aesthetic Theme)
+   SPM 業績系統 - 寶寶藍可愛風格 & 全域 RWD 響應式核心樣式
+   檔案路徑：src/assets/rwd.css
    ========================================================== */
 
-/* --- 1. Element Plus 全域 CSS 變數覆蓋 --- */
+/* ----------------------------------------------------------
+   1. Element Plus 全域 CSS 變數覆蓋 (寶寶藍可愛色票)
+   ---------------------------------------------------------- */
 :root {
-  /* 核心寶寶藍品牌色 */
+  /* 核心寶寶藍品牌色系 */
   --el-color-primary: #76aefe;
   --el-color-primary-light-3: #99c4ff;
   --el-color-primary-light-5: #bad7ff;
@@ -13,7 +16,7 @@
   --el-color-primary-light-9: #f3f8fe;
   --el-color-primary-dark-2: #5c98e8;
 
-  /* 柔和可愛輔助色 */
+  /* 柔和粉嫩輔助色 */
   --el-color-success: #70d6a3; /* 櫻草薄荷綠 */
   --el-color-warning: #ffb86c; /* 蜜桃杏色 */
   --el-color-danger: #ff8fa3;  /* 草莓軟糖粉 */
@@ -33,7 +36,9 @@
   --el-border-radius-round: 30px;
 }
 
-/* --- 2. 頁面基底背景與自訂萌系捲軸 --- */
+/* ----------------------------------------------------------
+   2. 基礎容器與萌系寶寶藍捲軸
+   ---------------------------------------------------------- */
 html, body {
   background-color: #f3f8fe !important;
   color: #3d5069;
@@ -46,7 +51,15 @@ html, body {
   box-sizing: border-box;
 }
 
-/* 超可愛寶寶藍捲軸 */
+/* 確保所有輸入控制元件在小螢幕不破版 */
+.el-input,
+.el-select,
+.el-date-editor,
+.el-input-number {
+  max-width: 100%;
+}
+
+/* 寶寶藍客製化捲軸 */
 ::-webkit-scrollbar {
   width: 7px;
   height: 7px;
@@ -63,7 +76,9 @@ html, body {
   background: #89bdfa;
 }
 
-/* --- 3. 雲朵感圓潤卡片 (Cards) --- */
+/* ----------------------------------------------------------
+   3. 雲朵感圓潤卡片 (Cards)
+   ---------------------------------------------------------- */
 .el-card {
   border-radius: 22px !important;
   border: 1.5px solid #e1effe !important;
@@ -81,7 +96,9 @@ html, body {
   padding: 16px 20px !important;
 }
 
-/* --- 4. 膠囊糖果風按鈕 (Buttons) --- */
+/* ----------------------------------------------------------
+   4. 膠囊糖果風實心按鈕 (Solid Buttons)
+   ---------------------------------------------------------- */
 .el-button {
   border-radius: 20px !important;
   font-weight: 700 !important;
@@ -93,40 +110,117 @@ html, body {
   transform: translateY(-2px);
 }
 
-.el-button--primary {
+.el-button--primary:not(.is-link) {
   background: linear-gradient(135deg, #8dc0fd 0%, #6da6fa 100%) !important;
   border: none !important;
   box-shadow: 0 4px 14px rgba(109, 166, 250, 0.35) !important;
   color: #ffffff !important;
 }
 
-.el-button--primary:hover {
+.el-button--primary:not(.is-link):hover {
   background: linear-gradient(135deg, #9ccafc 0%, #7bb2fa 100%) !important;
   box-shadow: 0 6px 18px rgba(109, 166, 250, 0.45) !important;
 }
 
-.el-button--success {
+.el-button--success:not(.is-link) {
   background: linear-gradient(135deg, #8ce0b4 0%, #62cc99 100%) !important;
   border: none !important;
   box-shadow: 0 4px 14px rgba(98, 204, 153, 0.35) !important;
   color: #ffffff !important;
 }
 
-.el-button--danger {
+.el-button--danger:not(.is-link) {
   background: linear-gradient(135deg, #ffa2b4 0%, #ff7b94 100%) !important;
   border: none !important;
   box-shadow: 0 4px 14px rgba(255, 123, 148, 0.35) !important;
   color: #ffffff !important;
 }
 
-/* 幽靈 / 連結按鈕 */
-.el-button--primary.is-link,
-.el-button--danger.is-link {
-  box-shadow: none !important;
-  background: transparent !important;
+/* ----------------------------------------------------------
+   5. 馬卡龍雙色可愛操作膠囊按鈕 (前往總表、編輯、刪除)
+   ---------------------------------------------------------- */
+.el-button.is-link {
+  font-weight: 800 !important;
+  padding: 5px 13px !important;
+  border-radius: 14px !important;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  font-size: 13px !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
 }
 
-/* --- 5. 輸入框與選擇器圓角優化 (Inputs & Selects) --- */
+/* A. 雲朵棉花糖藍膠囊 (前往完整總表、編輯按鈕) */
+.el-button--primary.is-link {
+  color: #317be2 !important;
+  background-color: #eaf3fe !important;
+  border: 1.5px solid #c8e0fd !important;
+  box-shadow: 0 2px 8px rgba(92, 158, 245, 0.16) !important;
+}
+
+.el-button--primary.is-link:hover {
+  background-color: #d8ebfe !important;
+  color: #1f68cf !important;
+  border-color: #add1fc !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(92, 158, 245, 0.28) !important;
+}
+
+/* B. 草莓牛奶軟糖粉膠囊 (刪除按鈕) */
+.el-button--danger.is-link {
+  color: #ec4c6e !important;
+  background-color: #fff0f3 !important;
+  border: 1.5px solid #ffd5de !important;
+  box-shadow: 0 2px 8px rgba(236, 76, 110, 0.14) !important;
+}
+
+.el-button--danger.is-link:hover {
+  background-color: #ffe3e9 !important;
+  color: #d83054 !important;
+  border-color: #ffbdcc !important;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(236, 76, 110, 0.24) !important;
+}
+
+/* 按下時的果凍微回彈反饋 */
+.el-button.is-link:active {
+  transform: scale(0.93) !important;
+}
+
+/* 表格內的按鈕排版容器 */
+.table-action-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.table-action-group :deep(.el-popconfirm) {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* 刪除確認彈窗 (Popconfirm) 的確定按鈕：同步搭配草莓粉漸層 */
+.el-popconfirm__action .el-button--danger {
+  background: linear-gradient(135deg, #ffa2b4 0%, #ff6b87 100%) !important;
+  border: none !important;
+  border-radius: 12px !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 3px 10px rgba(255, 107, 135, 0.35) !important;
+}
+
+.el-popconfirm__action .el-button--danger:hover {
+  background: linear-gradient(135deg, #ffb3c2 0%, #ff7b95 100%) !important;
+  transform: translateY(-1px);
+}
+
+/* ----------------------------------------------------------
+   6. 輸入框、選擇器與文字框 (Inputs & Selects)
+   ---------------------------------------------------------- */
 .el-input__wrapper,
 .el-select__wrapper,
 .el-textarea__inner {
@@ -143,7 +237,9 @@ html, body {
   box-shadow: 0 0 0 1.5px #76aefe inset, 0 4px 12px rgba(118, 174, 254, 0.2) !important;
 }
 
-/* --- 6. 萌系標籤 (Tags) --- */
+/* ----------------------------------------------------------
+   7. 萌系標籤 (Tags)
+   ---------------------------------------------------------- */
 .el-tag {
   border-radius: 20px !important;
   font-weight: 700 !important;
@@ -171,7 +267,9 @@ html, body {
   color: #f39834 !important;
 }
 
-/* --- 7. 可愛圓潤表格 (Tables) --- */
+/* ----------------------------------------------------------
+   8. 可愛圓潤表格 (Tables)
+   ---------------------------------------------------------- */
 .el-table {
   border-radius: 18px !important;
   overflow: hidden !important;
@@ -193,7 +291,9 @@ html, body {
   background-color: #f5faff !important;
 }
 
-/* --- 8. 圓潤馬卡龍彈窗 (Dialogs) --- */
+/* ----------------------------------------------------------
+   9. 圓潤彈窗 (Dialogs)
+   ---------------------------------------------------------- */
 .el-dialog {
   border-radius: 24px !important;
   border: 2px solid #e1effe !important;
@@ -219,7 +319,9 @@ html, body {
   background-color: #fafcfe !important;
 }
 
-/* --- 9. 進度條萌化 (Progress) --- */
+/* ----------------------------------------------------------
+   10. 進度條與單選切換組
+   ---------------------------------------------------------- */
 .el-progress-bar__outer {
   border-radius: 20px !important;
   background-color: #e6f1fe !important;
@@ -230,7 +332,6 @@ html, body {
   background: linear-gradient(90deg, #99c6fe 0%, #68a4fa 100%) !important;
 }
 
-/* --- 10. 單選按鈕切換組 (Radio Button Switch) --- */
 .el-radio-button:first-child .el-radio-button__inner {
   border-radius: 18px 0 0 18px !important;
 }
@@ -246,9 +347,9 @@ html, body {
   box-shadow: -1px 0 0 0 #76aefe !important;
 }
 
-/* ==========================================================
-   RWD 手機與平板專屬切換
-   ========================================================== */
+/* ----------------------------------------------------------
+   11. RWD 響應式佈局控制類別
+   ---------------------------------------------------------- */
 .desktop-view-only {
   display: block;
 }
@@ -256,51 +357,12 @@ html, body {
   display: none;
 }
 
-@media screen and (max-width: 768px) {
-  .desktop-view-only {
-    display: none !important;
-  }
-  .mobile-view-only {
-    display: flex !important;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .el-dialog {
-    width: 92% !important;
-    max-width: 92% !important;
-    margin: 20px auto !important;
-    border-radius: 20px !important;
-  }
-
-  .el-dialog__body {
-    padding: 16px !important;
-    max-height: 70vh;
-    overflow-y: auto;
-  }
-
-  .el-dialog .el-form-item {
-    display: flex;
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    margin-bottom: 12px !important;
-  }
-
-  .el-dialog .el-form-item__label {
-    text-align: left !important;
-    margin-bottom: 4px !important;
-    padding: 0 !important;
-  }
-
-  .el-dialog .el-form-item__content {
-    margin-left: 0 !important;
-    width: 100% !important;
-  }
-
+/* 中型螢幕斷點 (<= 992px) */
+@media screen and (max-width: 992px) {
   .search-card .el-form {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
 
   .search-card .el-form-item {
@@ -315,11 +377,139 @@ html, body {
 
   .action-toolbar {
     flex-direction: column !important;
-    gap: 8px !important;
+    gap: 10px !important;
   }
 
   .action-toolbar .el-button {
     width: 100% !important;
     margin-left: 0 !important;
   }
+}
+
+/* 行動裝置斷點 (<= 768px) */
+@media screen and (max-width: 768px) {
+  /* 視圖切換：隱藏過寬表格，顯示手機卡片 */
+  .desktop-view-only {
+    display: none !important;
+  }
+  .mobile-view-only {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* 彈窗自適應螢幕 */
+  .el-dialog {
+    width: 92% !important;
+    max-width: 92% !important;
+    margin: 20px auto !important;
+    border-radius: 20px !important;
+  }
+
+  .el-dialog__body {
+    padding: 16px !important;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  /* 表單標籤轉為上方排列 */
+  .el-dialog .el-form-item {
+    display: flex;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    margin-bottom: 12px !important;
+  }
+
+  .el-dialog .el-form-item__label {
+    justify-content: flex-start !important;
+    text-align: left !important;
+    margin-bottom: 4px !important;
+    padding: 0 !important;
+  }
+
+  .el-dialog .el-form-item__content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  /* 手機版卡片操作區微調 */
+  .m-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    padding-top: 10px;
+    margin-top: 6px;
+    border-top: 1px dashed #e8f2fe;
+  }
+
+  .m-footer .el-button {
+    padding: 6px 14px !important;
+    font-size: 13px !important;
+  }
+}
+
+/* 1. 表格單元格強制不折行與置中 */
+.el-table .el-table__cell:has(.table-action-group) .cell {
+  overflow: visible !important;
+  white-space: nowrap !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 0 4px !important;
+}
+
+/* 2. 桌機表格操作按鈕群組容器 */
+.table-action-group {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+/* 清除 Element Plus 預設的按鈕左外距 (避免與 gap 疊加造成太寬) */
+.table-action-group .el-button,
+.table-action-group .el-popconfirm,
+.m-footer .el-button,
+.m-footer .el-popconfirm {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  flex-shrink: 0 !important;
+}
+
+.table-action-group .el-button.is-link {
+  height: 28px !important;
+  line-height: 28px !important;
+  padding: 0 10px !important;
+  box-sizing: border-box !important;
+}
+
+/* 3. 修復儀表板標題列按鈕 (前往完整總表) 在手機上被長標題擠壓 */
+.section-title {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+.section-title .el-button.is-link {
+  flex-shrink: 0 !important;
+}
+
+/* 4. 手機版卡片操作區防跑版 */
+.m-footer {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+}
+
+.m-footer .el-button.is-link {
+  height: 32px !important;
+  line-height: 32px !important;
+  padding: 0 12px !important;
 }

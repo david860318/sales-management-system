@@ -9,7 +9,7 @@
         </div>
       </template>
 
-      <!-- 需求 7: 月份搜尋篩選列 -->
+      <!-- 月份搜尋篩選列 -->
       <div class="filter-bar">
         <span class="filter-label">🔍 篩選目標月份：</span>
         <el-date-picker
@@ -36,9 +36,14 @@
           <el-table-column prop="existingClient" label="舊客目標" align="right" sortable>
             <template #default="scope"><span style="color: #4ab382; font-weight: bold;">$ {{ scope.row.existingClient.toLocaleString() }}</span></template>
           </el-table-column>
-          <el-table-column label="操作" width="100" align="center">
+          <!-- 操作欄：寬度調整為 120，加入防抖動 table-action-group 容器 -->
+          <el-table-column label="操作" width="120" align="center">
             <template #default="scope">
-              <el-button type="primary" link size="small" @click="openEditDialog(scope.row)">編輯</el-button>
+              <div class="table-action-group">
+                <el-button type="primary" link size="small" @click="openEditDialog(scope.row)">
+                  編輯
+                </el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -50,7 +55,7 @@
         <div v-for="item in tableData" :key="item.month" class="m-t-card">
           <div class="m-t-head">
             <span class="m-t-month">📅 {{ item.month }}</span>
-            <el-button type="primary" size="small" plain @click="openEditDialog(item)">編輯</el-button>
+            <el-button type="primary" link size="small" @click="openEditDialog(item)">編輯</el-button>
           </div>
           <div class="m-t-rows">
             <div class="m-t-row"><span>總目標：</span><strong>$ {{ item.total.toLocaleString() }}</strong></div>
@@ -87,10 +92,9 @@ import { ElMessage } from 'element-plus'
 const salesStore = useSalesStore()
 const dialogVisible = ref(false)
 const isEdit = ref(false)
-const filterMonth = ref('') // 需求 7: 篩選月份
+const filterMonth = ref('')
 const form = reactive({ month: '', total: 0, newClient: 0, existingClient: 0 })
 
-// 依篩選月份過濾列表
 const tableData = computed(() => {
   let months = Object.keys(salesStore.targets).sort()
   if (filterMonth.value) {
@@ -120,11 +124,10 @@ const openEditDialog = (row) => {
   dialogVisible.value = true
 }
 
-// 需求 7: 儲存與防呆檢查
 const saveTarget = async () => {
   if (!form.month) return ElMessage.warning('請選擇目標月份')
 
-  // 防呆：如果是在「新增模式」，檢查該月份是否已經存在
+  // 防呆：新增時若月份已存在則擋下
   if (!isEdit.value && salesStore.targets[form.month]) {
     ElMessage.error(`【警告】月份 ${form.month} 的目標已經存在！請直接從列表中點擊「編輯」進行修改。`)
     return

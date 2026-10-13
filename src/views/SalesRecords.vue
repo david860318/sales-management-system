@@ -79,12 +79,27 @@
             <span v-else style="color: #a1b5c9; font-size: 12px;">無需</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" align="center" fixed="right">
+        <el-table-column label="操作" width="160" align="center" fixed="right">
           <template #default="scope">
-            <el-button type="primary" link size="small" @click="openEditDialog(scope.row)">編輯</el-button>
-            <el-popconfirm title="確定要刪除這筆紀錄嗎？" @confirm="handleDelete(scope.row.id)">
-              <template #reference><el-button type="danger" link size="small">刪除</el-button></template>
-            </el-popconfirm>
+            <div class="table-action-group">
+              <el-button type="primary" link size="small" @click="openEditDialog(scope.row)">
+                編輯
+              </el-button>
+              <el-popconfirm
+                title="確定要刪除這筆紀錄嗎？"
+                confirm-button-text="確定"
+                cancel-button-text="取消"
+                confirm-button-type="danger"
+                width="200"
+                @confirm="handleDelete(scope.row.id)"
+              >
+                <template #reference>
+                  <el-button type="danger" link size="small">
+                    刪除
+                  </el-button>
+                </template>
+              </el-popconfirm>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -125,9 +140,22 @@
         </div>
 
         <div class="m-footer">
-          <el-button type="primary" size="small" plain @click="openEditDialog(item)">編輯</el-button>
-          <el-popconfirm title="確定刪除此紀錄？" @confirm="handleDelete(item.id)">
-            <template #reference><el-button type="danger" size="small" plain>刪除</el-button></template>
+          <el-button type="primary" link size="small" @click="openEditDialog(item)">
+            ✏️ 編輯
+          </el-button>
+          <el-popconfirm
+            title="確定刪除此紀錄？"
+            confirm-button-text="確定"
+            cancel-button-text="取消"
+            confirm-button-type="danger"
+            width="200"
+            @confirm="handleDelete(item.id)"
+          >
+            <template #reference>
+              <el-button type="danger" link size="small">
+                🗑️ 刪除
+              </el-button>
+            </template>
           </el-popconfirm>
         </div>
       </div>
@@ -349,4 +377,38 @@ const exportCSV = () => {
 .m-meta-row { display: flex; gap: 15px; font-size: 12px; color: #a1b5c9; }
 .m-dual-row { padding: 8px 0; border-top: 1px dashed #f0f7ff; margin-top: 8px; }
 .m-footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 8px; border-top: 1px solid #f8fbff; }
+
+/* 桌機表格內的按鈕排版容器 */
+.table-action-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+/* 確保 Popconfirm 外層容器不會破壞 flex 垂直置中對齊 */
+.table-action-group :deep(.el-popconfirm) {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* 手機版卡片底部排版 */
+.m-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding-top: 10px;
+  margin-top: 6px;
+  border-top: 1px dashed #e8f2fe;
+}
+
+/* 手機版按鈕稍微放大內距，更好手指點擊 */
+@media screen and (max-width: 768px) {
+  .m-footer .el-button {
+    padding: 6px 14px !important;
+    font-size: 13px !important;
+  }
+}
 </style>
