@@ -18,11 +18,19 @@
         </el-form-item>
         <el-form-item label="狀態">
           <el-select v-model="searchForm.status" placeholder="全部" clearable>
-            <el-option label="A初步洽談" value="A初步洽談" />
-            <el-option label="B報價中" value="B報價中" />
-            <el-option label="E輸單(已簽約)" value="E輸單(已簽約)" />
-            <el-option label="F開發票" value="F開發票" />
-            <el-option label="G流單" value="G流單" />
+            <el-option-group label="潛在業績階段">
+              <el-option label="A初步洽談" value="A初步洽談" />
+              <el-option label="B報價中" value="B報價中" />
+              <el-option label="C調整報價" value="C調整報價" />
+              <el-option label="D提供合約 (列入潛在業績)" value="D提供合約 (列入潛在業績)" />
+            </el-option-group>
+            <el-option-group label="結案階段 (列入實際達成)">
+              <el-option label="E輸單" value="E輸單" />
+              <el-option label="F開發票 (列入實際達成)" value="F開發票 (列入實際達成)" />
+            </el-option-group>
+            <el-option-group label="失效階段">
+              <el-option label="G流單 (不列入計算)" value="G流單 (不列入計算)" />
+            </el-option-group>
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -38,7 +46,7 @@
       <el-button type="success" :icon="Download" @click="exportCSV">匯出報表 (CSV)</el-button>
     </div>
 
-    <!-- 桌機版：所有欄位皆支援 sortable 排序 (需求 6) -->
+    <!-- 桌機版表格 -->
     <div class="desktop-view-only">
       <el-table :data="filteredTableData" border style="width: 100%" v-loading="loading">
         <el-table-column prop="month" label="歸屬月份" width="105" align="center" sortable />
@@ -52,24 +60,24 @@
             <el-tag :type="scope.row.clientType === '新客' ? 'primary' : 'success'" round size="small">{{ scope.row.clientType }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="狀態" width="130" align="center" sortable>
+        <el-table-column prop="status" label="狀態" width="170" align="center" sortable>
           <template #default="scope">
             <el-tag :type="getStatusColor(scope.row.status)" effect="dark" round size="small">{{ scope.row.status }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="amount" label="合約金額" align="right" width="120" sortable>
-          <template #default="scope">$ {{ scope.row.amount.toLocaleString() }}</template>
+          <template #default="scope">$ {{ Number(scope.row.amount || 0).toLocaleString() }}</template>
         </el-table-column>
         <el-table-column prop="cost" label="成本" align="right" width="110" sortable>
-          <template #default="scope">$ {{ scope.row.cost ? scope.row.cost.toLocaleString() : 0 }}</template>
+          <template #default="scope">$ {{ Number(scope.row.cost || 0).toLocaleString() }}</template>
         </el-table-column>
         <el-table-column prop="netRevenue" label="實際認列" align="right" width="125" sortable>
-          <template #default="scope"><strong style="color: #f28b9c;">$ {{ scope.row.netRevenue.toLocaleString() }}</strong></template>
+          <template #default="scope"><strong style="color: #f28b9c;">$ {{ Number(scope.row.netRevenue || 0).toLocaleString() }}</strong></template>
         </el-table-column>
         <el-table-column prop="expectedDate" label="預計結案日" width="120" align="center" sortable />
         <el-table-column prop="isDualSealCompleted" label="雙用印" width="100" align="center" sortable>
           <template #default="scope">
-            <div v-if="scope.row.amount > 300000 && scope.row.status.includes('E輸單')">
+            <div v-if="Number(scope.row.amount) > 300000 && isWonStatus(scope.row.status)">
               <el-checkbox v-model="scope.row.isDualSealCompleted" @change="(val) => updateDualSeal(scope.row, val)">
                 <span :style="{ color: scope.row.isDualSealCompleted ? '#83cbb1' : '#f28b9c', fontWeight: 'bold' }">
                   {{ scope.row.isDualSealCompleted ? '已完成' : '待申請' }}
@@ -82,22 +90,9 @@
         <el-table-column label="操作" width="160" align="center" fixed="right">
           <template #default="scope">
             <div class="table-action-group">
-              <el-button type="primary" link size="small" @click="openEditDialog(scope.row)">
-                編輯
-              </el-button>
-              <el-popconfirm
-                title="確定要刪除這筆紀錄嗎？"
-                confirm-button-text="確定"
-                cancel-button-text="取消"
-                confirm-button-type="danger"
-                width="200"
-                @confirm="handleDelete(scope.row.id)"
-              >
-                <template #reference>
-                  <el-button type="danger" link size="small">
-                    刪除
-                  </el-button>
-                </template>
+              <el-button type="primary" link size="small" @click="openEditDialog(scope.row)">編輯</el-button>
+              <el-popconfirm title="確定要刪除這筆紀錄嗎？" confirm-button-type="danger" width="200" @confirm="handleDelete(scope.row.id)">
+                <template #reference><el-button type="danger" link size="small">刪除</el-button></template>
               </el-popconfirm>
             </div>
           </template>
@@ -105,7 +100,7 @@
       </el-table>
     </div>
 
-    <!-- 手機版：卡片清單 -->
+    <!-- 手機版卡片清單 -->
     <div class="mobile-view-only" v-loading="loading">
       <div v-if="filteredTableData.length === 0" style="text-align: center; color: #a1b5c9; padding: 24px;">暫無業績紀錄</div>
       <div v-for="item in filteredTableData" :key="item.id" class="mobile-record-card">
@@ -124,38 +119,25 @@
 
           <div class="m-revenue-box">
             <span>實際認列：</span>
-            <strong class="revenue-val">$ {{ item.netRevenue.toLocaleString() }}</strong>
+            <strong class="revenue-val">$ {{ Number(item.netRevenue || 0).toLocaleString() }}</strong>
           </div>
 
           <div class="m-meta-row">
-            <span>合約：${{ item.amount.toLocaleString() }}</span>
-            <span v-if="item.cost">成本：${{ item.cost.toLocaleString() }}</span>
+            <span>合約：${{ Number(item.amount || 0).toLocaleString() }}</span>
+            <span v-if="item.cost">成本：${{ Number(item.cost || 0).toLocaleString() }}</span>
           </div>
         </div>
 
-        <div class="m-dual-row" v-if="item.amount > 300000 && item.status.includes('E輸單')">
+        <div class="m-dual-row" v-if="Number(item.amount) > 300000 && isWonStatus(item.status)">
           <el-checkbox v-model="item.isDualSealCompleted" @change="(val) => updateDualSeal(item, val)">
             雙用印：{{ item.isDualSealCompleted ? '已完成' : '待申請' }}
           </el-checkbox>
         </div>
 
         <div class="m-footer">
-          <el-button type="primary" link size="small" @click="openEditDialog(item)">
-            ✏️ 編輯
-          </el-button>
-          <el-popconfirm
-            title="確定刪除此紀錄？"
-            confirm-button-text="確定"
-            cancel-button-text="取消"
-            confirm-button-type="danger"
-            width="200"
-            @confirm="handleDelete(item.id)"
-          >
-            <template #reference>
-              <el-button type="danger" link size="small">
-                🗑️ 刪除
-              </el-button>
-            </template>
+          <el-button type="primary" link size="small" @click="openEditDialog(item)">編輯</el-button>
+          <el-popconfirm title="確定刪除此紀錄？" confirm-button-type="danger" width="200" @confirm="handleDelete(item.id)">
+            <template #reference><el-button type="danger" link size="small">刪除</el-button></template>
           </el-popconfirm>
         </div>
       </div>
@@ -163,7 +145,7 @@
 
     <!-- 新增 / 編輯對話框 -->
     <el-dialog v-model="dialogVisible" :title="isEditMode ? '編輯業績紀錄' : '新增業績紀錄'" @closed="resetForm">
-      <el-form :model="form" label-width="110px">
+      <el-form :model="form" :label-position="isMobile ? 'top' : 'left'" label-width="110px">
         <el-form-item label="歸屬月份"><el-date-picker v-model="form.month" type="month" value-format="YYYY-MM" style="width: 100%" /></el-form-item>
         <el-form-item label="客戶屬性">
           <el-radio-group v-model="form.clientType"><el-radio value="新客">新客</el-radio><el-radio value="舊客">舊客</el-radio></el-radio-group>
@@ -173,15 +155,26 @@
         <el-form-item label="專案名稱"><el-input v-model="form.projectName" placeholder="輸入專案名稱" /></el-form-item>
         <el-form-item label="產品名稱"><el-input v-model="form.productName" placeholder="輸入產品名稱" /></el-form-item>
         <el-form-item label="商機來源"><el-input v-model="form.source" placeholder="例如：官網名單、轉介紹" /></el-form-item>
+        
+        <!-- 7 個推進狀態選項 -->
         <el-form-item label="推進狀態">
           <el-select v-model="form.status" style="width: 100%">
-            <el-option label="A初步洽談" value="A初步洽談" />
-            <el-option label="B報價中" value="B報價中" />
-            <el-option label="E輸單(已簽約)" value="E輸單(已簽約)" />
-            <el-option label="F開發票" value="F開發票" />
-            <el-option label="G流單" value="G流單" />
+            <el-option-group label="潛在業績階段">
+              <el-option label="A初步洽談" value="A初步洽談" />
+              <el-option label="B報價中" value="B報價中" />
+              <el-option label="C調整報價" value="C調整報價" />
+              <el-option label="D提供合約 (列入潛在業績)" value="D提供合約 (列入潛在業績)" />
+            </el-option-group>
+            <el-option-group label="結案階段 (列入實際達成)">
+              <el-option label="E輸單" value="E輸單" />
+              <el-option label="F開發票 (列入實際達成)" value="F開發票 (列入實際達成)" />
+            </el-option-group>
+            <el-option-group label="失效階段">
+              <el-option label="G流單 (不列入計算)" value="G流單 (不列入計算)" />
+            </el-option-group>
           </el-select>
         </el-form-item>
+
         <el-form-item label="合約總額"><el-input-number v-model="form.amount" :min="0" :step="10000" style="width: 100%" @change="autoCalculateNet" /></el-form-item>
         <el-form-item label="成本金額"><el-input-number v-model="form.cost" :min="0" :step="1000" style="width: 100%" @change="autoCalculateNet" /></el-form-item>
         <el-form-item label="實際認列"><el-input-number v-model="form.netRevenue" :min="0" :step="10000" style="width: 100%" /></el-form-item>
@@ -197,7 +190,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { Plus, Download, Search } from '@element-plus/icons-vue'
 import { useSalesStore } from '../stores/salesStore'
@@ -211,6 +204,9 @@ const submitting = ref(false)
 const dialogVisible = ref(false)
 const isEditMode = ref(false)
 const currentEditId = ref(null)
+const isMobile = ref(false)
+
+const handleResize = () => { isMobile.value = window.innerWidth <= 768 }
 
 const searchForm = reactive({ dateRange: [], clientName: '', clientType: '', status: '' })
 const appliedSearch = reactive({ dateRange: [], clientName: '', clientType: '', status: '' })
@@ -234,16 +230,20 @@ const defaultForm = {
 const form = reactive({ ...defaultForm })
 
 onMounted(async () => {
-  // 需求 4: 檢查是否有傳入 month 參數，有則自動篩選該月份
+  handleResize()
+  window.addEventListener('resize', handleResize)
   if (route.query.month) {
     const targetMonth = String(route.query.month)
     searchForm.dateRange = [targetMonth, targetMonth]
     appliedSearch.dateRange = [targetMonth, targetMonth]
   }
-
   loading.value = true
   await salesStore.fetchAppData()
   loading.value = false
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
 })
 
 const handleSearch = () => {
@@ -264,17 +264,25 @@ const resetSearch = () => {
 const filteredTableData = computed(() => {
   return salesStore.records.filter(r => {
     const matchDate = (!appliedSearch.dateRange || appliedSearch.dateRange.length !== 2) || (r.month >= appliedSearch.dateRange[0] && r.month <= appliedSearch.dateRange[1])
-    const matchName = !appliedSearch.clientName || r.clientName.includes(appliedSearch.clientName)
+    const matchName = !appliedSearch.clientName || (r.clientName && r.clientName.includes(appliedSearch.clientName))
     const matchType = !appliedSearch.clientType || r.clientType === appliedSearch.clientType
     const matchStatus = !appliedSearch.status || r.status === appliedSearch.status
     return matchDate && matchName && matchType && matchStatus
   })
 })
 
+// 判斷是否為結案狀態（E輸單 / F開發票）
+const isWonStatus = (status) => {
+  if (!status) return false
+  return status.startsWith('E') || status.startsWith('F')
+}
+
 const getStatusColor = (status) => {
-  if (status.includes('輸單') || status.includes('開發票')) return 'success'
-  if (status.includes('流單')) return 'info'
-  return 'warning'
+  if (!status) return 'info'
+  if (status.startsWith('E') || status.startsWith('F')) return 'success' // 結案階段
+  if (status.startsWith('G')) return 'info'                             // 流單失效
+  if (status.startsWith('D')) return 'warning'                          // 提供合約
+  return 'primary'                                                     // 洽談 / 報價中
 }
 
 const autoCalculateNet = () => {
@@ -377,38 +385,4 @@ const exportCSV = () => {
 .m-meta-row { display: flex; gap: 15px; font-size: 12px; color: #a1b5c9; }
 .m-dual-row { padding: 8px 0; border-top: 1px dashed #f0f7ff; margin-top: 8px; }
 .m-footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 8px; border-top: 1px solid #f8fbff; }
-
-/* 桌機表格內的按鈕排版容器 */
-.table-action-group {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  white-space: nowrap;
-}
-
-/* 確保 Popconfirm 外層容器不會破壞 flex 垂直置中對齊 */
-.table-action-group :deep(.el-popconfirm) {
-  display: inline-flex;
-  align-items: center;
-}
-
-/* 手機版卡片底部排版 */
-.m-footer {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  padding-top: 10px;
-  margin-top: 6px;
-  border-top: 1px dashed #e8f2fe;
-}
-
-/* 手機版按鈕稍微放大內距，更好手指點擊 */
-@media screen and (max-width: 768px) {
-  .m-footer .el-button {
-    padding: 6px 14px !important;
-    font-size: 13px !important;
-  }
-}
 </style>

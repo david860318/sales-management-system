@@ -491,9 +491,11 @@ const stageSummary = computed(() => {
   const stages = [
     { name: 'A初步洽談', class: 'st-talk' },
     { name: 'B報價中', class: 'st-quote' },
+    { name: 'C調整報價', class: 'st-adjust' },
+    { name: 'D提供合約', class: 'st-contract' },
     { name: 'E輸單(已簽約)', class: 'st-won' },
-    { name: 'F開發票', class: 'st-invoice' },
-    { name: 'G流單', class: 'st-lost' }
+    { name: 'F開發票', class: 'st-invoice' }
+    
   ]
   return stages.map(s => {
     const list = currentRecords.value.filter(r => r.status.includes(s.name.slice(0, 2)))
@@ -543,7 +545,7 @@ const monthlyBreakdown = computed(() => {
     const monthRecords = salesStore.records.filter(r => r.month === m)
 
     const actualRecords = monthRecords.filter(r => r.status.includes('輸單') || r.status.includes('開發票'))
-    const pipelineRecords = monthRecords.filter(r => r.status.includes('洽談') || r.status.includes('報價') || r.status.includes('提供合約'))
+    const pipelineRecords = monthRecords.filter(r => r.status.includes('提供合約'))
 
     const totalActual = actualRecords.reduce((sum, r) => sum + (Number(r.netRevenue) || 0), 0)
     const totalPipeline = pipelineRecords.reduce((sum, r) => sum + (Number(r.netRevenue) || 0), 0)
