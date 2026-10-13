@@ -1,10 +1,254 @@
-/* src/assets/rwd.css */
-
 /* ==========================================================
-   桌機版 (寬度 > 768px)：完全保持原生，不做額外覆蓋
+   SPM 系統 - 寶寶藍可愛風 (Baby Blue Cute Aesthetic Theme)
    ========================================================== */
 
-/* 提供切換類別：桌機顯示 / 手機顯示 */
+/* --- 1. Element Plus 全域 CSS 變數覆蓋 --- */
+:root {
+  /* 核心寶寶藍品牌色 */
+  --el-color-primary: #76aefe;
+  --el-color-primary-light-3: #99c4ff;
+  --el-color-primary-light-5: #bad7ff;
+  --el-color-primary-light-7: #dbeaff;
+  --el-color-primary-light-8: #e8f2fe;
+  --el-color-primary-light-9: #f3f8fe;
+  --el-color-primary-dark-2: #5c98e8;
+
+  /* 柔和可愛輔助色 */
+  --el-color-success: #70d6a3; /* 櫻草薄荷綠 */
+  --el-color-warning: #ffb86c; /* 蜜桃杏色 */
+  --el-color-danger: #ff8fa3;  /* 草莓軟糖粉 */
+  --el-color-info: #a0aec0;
+
+  /* 文字與背景 */
+  --el-text-color-primary: #3d5069;
+  --el-text-color-regular: #5f748d;
+  --el-text-color-secondary: #8fa3b8;
+  --el-bg-color: #f3f8fe;
+  --el-border-color-light: #e0edfe;
+  --el-border-color-lighter: #ebf4ff;
+
+  /* 全域圓角升級 */
+  --el-border-radius-base: 14px;
+  --el-border-radius-small: 10px;
+  --el-border-radius-round: 30px;
+}
+
+/* --- 2. 頁面基底背景與自訂萌系捲軸 --- */
+html, body {
+  background-color: #f3f8fe !important;
+  color: #3d5069;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* 超可愛寶寶藍捲軸 */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #edf5fe;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #b5d5fc;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #89bdfa;
+}
+
+/* --- 3. 雲朵感圓潤卡片 (Cards) --- */
+.el-card {
+  border-radius: 22px !important;
+  border: 1.5px solid #e1effe !important;
+  background: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(123, 181, 249, 0.12) !important;
+  transition: all 0.25s ease-in-out !important;
+}
+
+.el-card:hover {
+  box-shadow: 0 12px 30px rgba(123, 181, 249, 0.2) !important;
+}
+
+.el-card__header {
+  border-bottom: 1.5px dashed #e8f2fe !important;
+  padding: 16px 20px !important;
+}
+
+/* --- 4. 膠囊糖果風按鈕 (Buttons) --- */
+.el-button {
+  border-radius: 20px !important;
+  font-weight: 700 !important;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  padding: 8px 18px !important;
+}
+
+.el-button:hover {
+  transform: translateY(-2px);
+}
+
+.el-button--primary {
+  background: linear-gradient(135deg, #8dc0fd 0%, #6da6fa 100%) !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(109, 166, 250, 0.35) !important;
+  color: #ffffff !important;
+}
+
+.el-button--primary:hover {
+  background: linear-gradient(135deg, #9ccafc 0%, #7bb2fa 100%) !important;
+  box-shadow: 0 6px 18px rgba(109, 166, 250, 0.45) !important;
+}
+
+.el-button--success {
+  background: linear-gradient(135deg, #8ce0b4 0%, #62cc99 100%) !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(98, 204, 153, 0.35) !important;
+  color: #ffffff !important;
+}
+
+.el-button--danger {
+  background: linear-gradient(135deg, #ffa2b4 0%, #ff7b94 100%) !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(255, 123, 148, 0.35) !important;
+  color: #ffffff !important;
+}
+
+/* 幽靈 / 連結按鈕 */
+.el-button--primary.is-link,
+.el-button--danger.is-link {
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* --- 5. 輸入框與選擇器圓角優化 (Inputs & Selects) --- */
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  border-radius: 14px !important;
+  background-color: #f7fbff !important;
+  box-shadow: 0 0 0 1px #d9ecfe inset !important;
+  transition: all 0.2s ease !important;
+}
+
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused,
+.el-textarea__inner:focus {
+  background-color: #ffffff !important;
+  box-shadow: 0 0 0 1.5px #76aefe inset, 0 4px 12px rgba(118, 174, 254, 0.2) !important;
+}
+
+/* --- 6. 萌系標籤 (Tags) --- */
+.el-tag {
+  border-radius: 20px !important;
+  font-weight: 700 !important;
+  padding: 0 12px !important;
+  border: none !important;
+}
+
+.el-tag--primary {
+  background-color: #e5f0fe !important;
+  color: #5896e8 !important;
+}
+
+.el-tag--success {
+  background-color: #e4f9ee !important;
+  color: #3bb87f !important;
+}
+
+.el-tag--danger {
+  background-color: #ffeef1 !important;
+  color: #f86f8a !important;
+}
+
+.el-tag--warning {
+  background-color: #fff4e5 !important;
+  color: #f39834 !important;
+}
+
+/* --- 7. 可愛圓潤表格 (Tables) --- */
+.el-table {
+  border-radius: 18px !important;
+  overflow: hidden !important;
+  border: 1.5px solid #e1effe !important;
+}
+
+.el-table th.el-table__cell {
+  background-color: #eef6fe !important;
+  color: #4a6585 !important;
+  font-weight: 800 !important;
+  border-bottom: 1.5px solid #dcebfe !important;
+}
+
+.el-table td.el-table__cell {
+  border-bottom: 1px dashed #e8f2fe !important;
+}
+
+.el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell {
+  background-color: #f5faff !important;
+}
+
+/* --- 8. 圓潤馬卡龍彈窗 (Dialogs) --- */
+.el-dialog {
+  border-radius: 24px !important;
+  border: 2px solid #e1effe !important;
+  box-shadow: 0 16px 40px rgba(118, 174, 254, 0.25) !important;
+  overflow: hidden !important;
+}
+
+.el-dialog__header {
+  background-color: #f5faff !important;
+  margin-right: 0 !important;
+  padding: 20px 24px !important;
+  border-bottom: 1.5px dashed #e1effe !important;
+}
+
+.el-dialog__title {
+  font-weight: 800 !important;
+  color: #435b78 !important;
+}
+
+.el-dialog__footer {
+  padding: 16px 24px !important;
+  border-top: 1.5px dashed #eef6fe !important;
+  background-color: #fafcfe !important;
+}
+
+/* --- 9. 進度條萌化 (Progress) --- */
+.el-progress-bar__outer {
+  border-radius: 20px !important;
+  background-color: #e6f1fe !important;
+}
+
+.el-progress-bar__inner {
+  border-radius: 20px !important;
+  background: linear-gradient(90deg, #99c6fe 0%, #68a4fa 100%) !important;
+}
+
+/* --- 10. 單選按鈕切換組 (Radio Button Switch) --- */
+.el-radio-button:first-child .el-radio-button__inner {
+  border-radius: 18px 0 0 18px !important;
+}
+.el-radio-button:last-child .el-radio-button__inner {
+  border-radius: 0 18px 18px 0 !important;
+}
+.el-radio-button__inner {
+  border-color: #dbeaff !important;
+}
+.el-radio-button__orig-radio:checked + .el-radio-button__inner {
+  background-color: #76aefe !important;
+  border-color: #76aefe !important;
+  box-shadow: -1px 0 0 0 #76aefe !important;
+}
+
+/* ==========================================================
+   RWD 手機與平板專屬切換
+   ========================================================== */
 .desktop-view-only {
   display: block;
 }
@@ -12,11 +256,7 @@
   display: none;
 }
 
-/* ==========================================================
-   手機與平板版 (寬度 <= 768px)：專屬排版優化
-   ========================================================== */
 @media screen and (max-width: 768px) {
-  /* 視圖切換 */
   .desktop-view-only {
     display: none !important;
   }
@@ -26,21 +266,19 @@
     gap: 12px;
   }
 
-  /* 1. 彈窗 Dialog 自動貼合手機螢幕，避免破版 */
   .el-dialog {
     width: 92% !important;
     max-width: 92% !important;
     margin: 20px auto !important;
-    border-radius: 16px !important;
+    border-radius: 20px !important;
   }
 
   .el-dialog__body {
-    padding: 14px !important;
+    padding: 16px !important;
     max-height: 70vh;
     overflow-y: auto;
   }
 
-  /* 2. 彈窗內的表單在手機上直向排列，避免 label 被擠扁 */
   .el-dialog .el-form-item {
     display: flex;
     flex-direction: column !important;
@@ -52,7 +290,6 @@
     text-align: left !important;
     margin-bottom: 4px !important;
     padding: 0 !important;
-    line-height: 1.3 !important;
   }
 
   .el-dialog .el-form-item__content {
@@ -60,7 +297,6 @@
     width: 100% !important;
   }
 
-  /* 3. 搜尋列在手機上直向堆疊 */
   .search-card .el-form {
     display: flex;
     flex-direction: column;
@@ -77,7 +313,6 @@
     width: 100% !important;
   }
 
-  /* 4. 操作按鈕（新增、匯出）在手機上垂直滿版好點擊 */
   .action-toolbar {
     flex-direction: column !important;
     gap: 8px !important;
