@@ -43,18 +43,52 @@
     <!-- 工具列（新增、匯入、下載範本、匯出） -->
     <div class="action-toolbar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-        <el-button type="primary" :icon="Plus" @click="openAddDialog">新增業績紀錄</el-button>
-        <el-button type="primary" plain :icon="Upload" @click="openImportDialog">批次匯入 (Excel)</el-button>
-        <el-button type="info" plain :icon="Document" @click="downloadTemplate">下載匯入格式檔 (.xlsx)</el-button>
+        <el-button type="primary" :icon="Plus" @click="openAddDialog">新增合約專案</el-button>
+        <el-button type="primary" plain :icon="Upload" @click="openImportDialog">批次匯入分期 (Excel)</el-button>
+        <el-button type="info" plain :icon="Document" @click="downloadTemplate">下載母子分期範本 (.xlsx)</el-button>
       </div>
       <div>
         <el-button type="success" :icon="Download" @click="exportCSV">匯出報表 (CSV)</el-button>
       </div>
     </div>
 
-    <!-- 桌機版表格 -->
+    <!-- 桌機版表格：支援 row 展開看分期明細 -->
     <div class="desktop-view-only">
-      <el-table :data="filteredTableData" border style="width: 100%" v-loading="loading">
+      <el-table :data="filteredTableData" border style="width: 100%" v-loading="loading" row-key="id">
+        <!-- 展開列：檢視跨月分期明細 -->
+        <el-table-column type="expand" width="50">
+          <template #default="props">
+            <div class="expand-schedule-box">
+              <div class="esb-head">
+                <span class="esb-title">📅 跨月分期認列進度明細 (共 {{ props.row.schedules?.length || 1 }} 期)</span>
+                <span class="esb-sum">合約總額：${{ Number(props.row.amount || 0).toLocaleString() }} ｜ 已排定總額：${{ getSchedulesTotalAmount(props.row.schedules).toLocaleString() }}</span>
+              </div>
+              <el-table :data="props.row.schedules" border size="small" style="width: 100%; margin-top: 8px;">
+                <el-table-column prop="stageName" label="期別名稱" width="160" />
+                <el-table-column prop="month" label="認列月份" width="110" align="center" />
+                <el-table-column prop="status" label="期別推進狀態" width="180" align="center">
+                  <template #default="scope">
+                    <el-tag :type="getStatusColor(scope.row.status)" size="small" effect="dark" round>
+                      {{ scope.row.status }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="amount" label="本期金額" align="right" width="130">
+                  <template #default="scope">$ {{ Number(scope.row.amount || 0).toLocaleString() }}</template>
+                </el-table-column>
+                <el-table-column prop="cost" label="本期成本" align="right" width="120">
+                  <template #default="scope">$ {{ Number(scope.row.cost || 0).toLocaleString() }}</template>
+                </el-table-column>
+                <el-table-column prop="netRevenue" label="實際認列" align="right" width="130">
+                  <template #default="scope">
+                    <strong style="color: #f28b9c;">$ {{ Number(scope.row.netRevenue || 0).toLocaleString() }}</strong>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </template>
+        </el-table-column>
+
         <el-table-column prop="month" label="歸屬月份" width="105" align="center" sortable />
         <el-table-column prop="clientName" label="客戶名稱" width="130" show-overflow-tooltip sortable />
         <el-table-column prop="industry" label="產業類別" width="110" show-overflow-tooltip sortable />
@@ -73,6 +107,11 @@
         </el-table-column>
         <el-table-column prop="amount" label="合約金額" align="right" width="120" sortable>
           <template #default="scope">$ {{ Number(scope.row.amount || 0).toLocaleString() }}</template>
+        </el-table-column>
+        <el-table-column label="分期期數" width="95" align="center">
+          <template #default="scope">
+            <el-tag size="small" type="info" round>{{ scope.row.schedules?.length || 1 }} 期</el-tag>
+          </template>
         </el-table-column>
         <el-table-column prop="cost" label="成本" align="right" width="110" sortable>
           <template #default="scope">$ {{ Number(scope.row.cost || 0).toLocaleString() }}</template>
@@ -124,13 +163,16 @@
           <p class="m-desc" v-if="item.productName">產品：{{ item.productName }}</p>
 
           <div class="m-revenue-box">
-            <span>實際認列：</span>
-            <strong class="revenue-val">$ {{ Number(item.netRevenue || 0).toLocaleString() }}</strong>
+            <span>合約總額：</span>
+            <strong class="revenue-val">$ {{ Number(item.amount || 0).toLocaleString() }}</strong>
           </div>
 
-          <div class="m-meta-row">
-            <span>合約：${{ Number(item.amount || 0).toLocaleString() }}</span>
-            <span v-if="item.cost">成本：${{ Number(item.cost || 0).toLocaleString() }}</span>
+          <div class="m-schedules-list" v-if="item.schedules && item.schedules.length > 0">
+            <div class="ms-title">📌 分期認列進度：</div>
+            <div v-for="(sch, sIdx) in item.schedules" :key="sIdx" class="ms-item">
+              <span>{{ sch.stageName }} ({{ sch.month }})</span>
+              <strong>${{ Number(sch.netRevenue || 0).toLocaleString() }}</strong>
+            </div>
           </div>
         </div>
 
@@ -149,54 +191,125 @@
       </div>
     </div>
 
-    <!-- 1. 新增 / 編輯對話框 -->
-    <el-dialog v-model="dialogVisible" :title="isEditMode ? '編輯業績紀錄' : '新增業績紀錄'" @closed="resetForm">
+    <!-- 1. 新增 / 編輯對話框 (支援跨月分期) -->
+    <el-dialog v-model="dialogVisible" :title="isEditMode ? '編輯合約與分期設定' : '新增合約與分期設定'" width="780px" @closed="resetForm">
       <el-form :model="form" :label-position="isMobile ? 'top' : 'left'" label-width="110px">
-        <el-form-item label="歸屬月份"><el-date-picker v-model="form.month" type="month" value-format="YYYY-MM" style="width: 100%" /></el-form-item>
-        <el-form-item label="客戶屬性">
-          <el-radio-group v-model="form.clientType"><el-radio value="新客">新客</el-radio><el-radio value="舊客">舊客</el-radio></el-radio-group>
+        <el-row :gutter="16">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="歸屬月份"><el-date-picker v-model="form.month" type="month" value-format="YYYY-MM" style="width: 100%" /></el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="客戶屬性">
+              <el-radio-group v-model="form.clientType"><el-radio value="新客">新客</el-radio><el-radio value="舊客">舊客</el-radio></el-radio-group>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="16">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="客戶名稱"><el-input v-model="form.clientName" placeholder="輸入客戶名稱" /></el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="產業類別"><el-input v-model="form.industry" placeholder="輸入產業類別" /></el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="16">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="專案名稱"><el-input v-model="form.projectName" placeholder="輸入專案名稱" /></el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="產品名稱"><el-input v-model="form.productName" placeholder="輸入產品名稱" /></el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="16">
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="商機來源"><el-input v-model="form.source" placeholder="例如：官網名單、轉介紹" /></el-form-item>
+          </el-col>
+          <el-col :xs="24" :sm="12">
+            <el-form-item label="預計結案日"><el-date-picker v-model="form.expectedDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" /></el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-form-item label="合約總額">
+          <el-input-number v-model="form.amount" :min="0" :step="10000" style="width: 100%" @change="onTotalAmountChange" />
         </el-form-item>
-        <el-form-item label="客戶名稱"><el-input v-model="form.clientName" placeholder="輸入客戶名稱" /></el-form-item>
-        <el-form-item label="產業類別"><el-input v-model="form.industry" placeholder="輸入產業類別" /></el-form-item>
-        <el-form-item label="專案名稱"><el-input v-model="form.projectName" placeholder="輸入專案名稱" /></el-form-item>
-        <el-form-item label="產品名稱"><el-input v-model="form.productName" placeholder="輸入產品名稱" /></el-form-item>
-        <el-form-item label="商機來源"><el-input v-model="form.source" placeholder="例如：官網名單、轉介紹" /></el-form-item>
-        <el-form-item label="推進狀態">
-          <el-select v-model="form.status" style="width: 100%">
-            <el-option-group label="潛在業績階段">
-              <el-option label="A初步洽談" value="A初步洽談" />
-              <el-option label="B報價中" value="B報價中" />
-              <el-option label="C調整報價" value="C調整報價" />
-              <el-option label="D提供合約 (列入潛在業績)" value="D提供合約 (列入潛在業績)" />
-            </el-option-group>
-            <el-option-group label="結案階段 (列入實際達成)">
-              <el-option label="E輸單" value="E輸單" />
-              <el-option label="F開發票 (列入實際達成)" value="F開發票 (列入實際達成)" />
-            </el-option-group>
-            <el-option-group label="失效階段">
-              <el-option label="G流單 (不列入計算)" value="G流單 (不列入計算)" />
-            </el-option-group>
-          </el-select>
+
+        <!-- 跨月分期設定卡片 -->
+        <div class="schedules-editor-card">
+          <div class="sec-header">
+            <div class="sec-left">
+              <span class="sec-title">📑 跨月份分期認列規劃 (Schedules)</span>
+              <span class="sec-badge">{{ form.schedules.length }} 個期別</span>
+            </div>
+            <el-button type="primary" size="small" plain @click="addScheduleRow">＋ 新增分期</el-button>
+          </div>
+
+          <div v-for="(sch, sIndex) in form.schedules" :key="sch.id || sIndex" class="schedule-input-row">
+            <div class="sir-cell" style="flex: 2;">
+              <span class="sir-label">期別名稱</span>
+              <el-input v-model="sch.stageName" placeholder="例：訂金(30%)" size="small" />
+            </div>
+            <div class="sir-cell" style="flex: 2;">
+              <span class="sir-label">認列月份 *</span>
+              <el-date-picker v-model="sch.month" type="month" value-format="YYYY-MM" placeholder="月份" size="small" style="width: 100%" />
+            </div>
+            <div class="sir-cell" style="flex: 2.5;">
+              <span class="sir-label">該期狀態 *</span>
+              <el-select v-model="sch.status" size="small" style="width: 100%">
+                <el-option label="A初步洽談" value="A初步洽談" />
+                <el-option label="B報價中" value="B報價中" />
+                <el-option label="C調整報價" value="C調整報價" />
+                <el-option label="D提供合約 (列入潛在業績)" value="D提供合約 (列入潛在業績)" />
+                <el-option label="E輸單" value="E輸單" />
+                <el-option label="F開發票 (列入實際達成)" value="F開發票 (列入實際達成)" />
+                <el-option label="G流單 (不列入計算)" value="G流單 (不列入計算)" />
+              </el-select>
+            </div>
+            <div class="sir-cell" style="flex: 2;">
+              <span class="sir-label">本期金額 *</span>
+              <el-input-number v-model="sch.amount" :min="0" :controls="false" size="small" style="width: 100%" @change="recalcScheduleNet(sch)" />
+            </div>
+            <div class="sir-cell" style="flex: 1.5;">
+              <span class="sir-label">成本</span>
+              <el-input-number v-model="sch.cost" :min="0" :controls="false" size="small" style="width: 100%" @change="recalcScheduleNet(sch)" />
+            </div>
+            <div class="sir-cell" style="flex: 2;">
+              <span class="sir-label">實際認列</span>
+              <span class="sir-net">$ {{ Number(sch.netRevenue || 0).toLocaleString() }}</span>
+            </div>
+            <div class="sir-action" v-if="form.schedules.length > 1">
+              <el-button type="danger" link size="small" @click="removeScheduleRow(sIndex)">✕</el-button>
+            </div>
+          </div>
+
+          <!-- 分期平衡檢驗 -->
+          <div class="schedules-balance-bar" :class="{ 'is-balanced': isSchedulesBalanced }">
+            <span>各期金額加總：<strong>${{ schedulesSumAmount.toLocaleString() }}</strong> / 合約總額：<strong>${{ Number(form.amount || 0).toLocaleString() }}</strong></span>
+            <el-tag :type="isSchedulesBalanced ? 'success' : 'danger'" size="small" effect="dark" round>
+              {{ isSchedulesBalanced ? '金額已平衡 ✅' : `差額 $${Math.abs(form.amount - schedulesSumAmount).toLocaleString()} ⚠️` }}
+            </el-tag>
+          </div>
+        </div>
+
+        <el-form-item label="備註說明" style="margin-top: 14px;">
+          <el-input v-model="form.notes" type="textarea" :rows="2" placeholder="填寫合約與分期備註說明..." />
         </el-form-item>
-        <el-form-item label="合約總額"><el-input-number v-model="form.amount" :min="0" :step="10000" style="width: 100%" @change="autoCalculateNet" /></el-form-item>
-        <el-form-item label="成本金額"><el-input-number v-model="form.cost" :min="0" :step="1000" style="width: 100%" @change="autoCalculateNet" /></el-form-item>
-        <el-form-item label="實際認列"><el-input-number v-model="form.netRevenue" :min="0" :step="10000" style="width: 100%" /></el-form-item>
-        <el-form-item label="預計結案日"><el-date-picker v-model="form.expectedDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" /></el-form-item>
-        <el-form-item label="備註說明"><el-input v-model="form.notes" type="textarea" :rows="2" placeholder="填寫專案備註..." /></el-form-item>
       </el-form>
+
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitting" @click="submitForm">確認儲存</el-button>
       </template>
     </el-dialog>
 
-    <!-- 2. Excel 批次匯入對話框 -->
-    <el-dialog v-model="importDialogVisible" title="📤 批次匯入業績紀錄 (Excel)" width="560px" @closed="resetImport">
+    <!-- 2. Excel 批次匯入對話框 (支援母子單合併) -->
+    <el-dialog v-model="importDialogVisible" title="📤 批次匯入合約與跨月分期 (Excel)" width="580px" @closed="resetImport">
       <div class="import-tip-box">
-        <p><strong>💡 填寫指引：</strong></p>
-        <p>1. 推進狀態欄位<strong>可直接填入代碼 A、B、C、D、E、F、G</strong>（不分大小寫），系統將自動轉換為對應階段。</p>
-        <p>2. 必填欄位：<strong>歸屬月份、客戶屬性、客戶名稱、推進狀態、合約總額、實際認列</strong>。</p>
-        <p>3. 支援檔案格式：<code>.xlsx</code>、<code>.xls</code>。</p>
+        <p><strong>💡 母子單匯入規範：</strong></p>
+        <p>1. 同一合約若有多個分期，請填寫相同的<strong>「客戶名稱 ＋ 專案名稱」</strong>，系統將自動合併為同一合約下的跨月分期！</p>
+        <p>2. 狀態欄位可填完整名稱或<strong>直接填入 A、B、C、D、E、F、G 代碼</strong>。</p>
       </div>
 
       <el-upload
@@ -207,39 +320,24 @@
         :limit="1"
         accept=".xlsx, .xls"
         :on-change="handleFileChange"
-        :on-exceed="() => ElMessage.warning('一次僅能上傳一個檔案')"
       >
         <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
-        <div class="el-upload__text">
-          將 Excel 檔案拖曳至此處，或<em>點擊選取檔案</em>
-        </div>
+        <div class="el-upload__text">將 Excel 拖曳至此處，或<em>點擊選取檔案</em></div>
       </el-upload>
 
-      <!-- 預檢結果提示 -->
       <div v-if="parsedRecords.length > 0" class="import-preview-box">
         <el-alert
-          :title="`成功解析 ${parsedRecords.length} 筆資料！${importErrors.length > 0 ? `（其中 ${importErrors.length} 筆存在錯誤被略過）` : ''}`"
-          :type="importErrors.length > 0 ? 'warning' : 'success'"
+          :title="`成功解析 ${parsedRecords.length} 筆合約（共含 ${parsedTotalSchedules} 個跨月分期認列）！`"
+          type="success"
           :closable="false"
           show-icon
         />
-        <div v-if="importErrors.length > 0" class="import-error-list">
-          <div v-for="(err, idx) in importErrors.slice(0, 5)" :key="idx" class="err-item">
-            ⚠️ {{ err }}
-          </div>
-          <div v-if="importErrors.length > 5" class="err-more">...其餘尚有 {{ importErrors.length - 5 }} 筆錯誤</div>
-        </div>
       </div>
 
       <template #footer>
         <el-button @click="importDialogVisible = false">取消</el-button>
-        <el-button
-          type="primary"
-          :loading="importing"
-          :disabled="parsedRecords.length === 0"
-          @click="confirmBatchImport"
-        >
-          確認匯入 ({{ parsedRecords.length }} 筆)
+        <el-button type="primary" :loading="importing" :disabled="parsedRecords.length === 0" @click="confirmBatchImport">
+          確認匯入 ({{ parsedRecords.length }} 筆合約)
         </el-button>
       </template>
     </el-dialog>
@@ -267,7 +365,6 @@ const isMobile = ref(false)
 const importDialogVisible = ref(false)
 const importing = ref(false)
 const parsedRecords = ref([])
-const importErrors = ref([])
 const uploadRef = ref(null)
 
 const handleResize = () => { isMobile.value = window.innerWidth <= 768 }
@@ -289,11 +386,13 @@ const defaultForm = {
   netRevenue: 0,
   expectedDate: null,
   notes: '',
-  isDualSealCompleted: false
+  isDualSealCompleted: false,
+  schedules: [
+    { id: 'sch-1', stageName: '單期全額', month: '', status: 'E輸單', amount: 0, cost: 0, netRevenue: 0 }
+  ]
 }
 const form = reactive({ ...defaultForm })
 
-// 7 個推進狀態對照字典 (代碼 A~G 映射)
 const STATUS_CODE_MAP = {
   'A': 'A初步洽談',
   'B': 'B報價中',
@@ -338,7 +437,9 @@ const resetSearch = () => {
 
 const filteredTableData = computed(() => {
   return salesStore.records.filter(r => {
-    const matchDate = (!appliedSearch.dateRange || appliedSearch.dateRange.length !== 2) || (r.month >= appliedSearch.dateRange[0] && r.month <= appliedSearch.dateRange[1])
+    const matchDate = (!appliedSearch.dateRange || appliedSearch.dateRange.length !== 2) ||
+      (r.schedules?.some(s => s.month >= appliedSearch.dateRange[0] && s.month <= appliedSearch.dateRange[1])) ||
+      (r.month >= appliedSearch.dateRange[0] && r.month <= appliedSearch.dateRange[1])
     const matchName = !appliedSearch.clientName || (r.clientName && r.clientName.includes(appliedSearch.clientName))
     const matchType = !appliedSearch.clientType || r.clientType === appliedSearch.clientType
     const matchStatus = !appliedSearch.status || r.status === appliedSearch.status
@@ -346,33 +447,80 @@ const filteredTableData = computed(() => {
   })
 })
 
-const isWonStatus = (status) => {
-  if (!status) return false
-  return status.startsWith('E') || status.startsWith('F')
-}
+const isWonStatus = (status) => status && (status.includes('輸單') || status.includes('開發票'))
 
 const getStatusColor = (status) => {
   if (!status) return 'info'
-  if (status.startsWith('E') || status.startsWith('F')) return 'success'
-  if (status.startsWith('G')) return 'info'
-  if (status.startsWith('D')) return 'warning'
+  if (status.includes('輸單') || status.includes('開發票')) return 'success'
+  if (status.includes('流單')) return 'info'
+  if (status.includes('提供合約')) return 'warning'
   return 'primary'
 }
 
-const autoCalculateNet = () => {
-  form.netRevenue = (Number(form.amount) || 0) - (Number(form.cost) || 0)
+// 分期加總計算
+const schedulesSumAmount = computed(() => {
+  return (form.schedules || []).reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
+})
+
+const isSchedulesBalanced = computed(() => {
+  return Number(form.amount) === schedulesSumAmount.value
+})
+
+const onTotalAmountChange = () => {
+  if (form.schedules && form.schedules.length === 1) {
+    form.schedules[0].amount = form.amount
+    recalcScheduleNet(form.schedules[0])
+  }
+}
+
+const addScheduleRow = () => {
+  const nextNum = form.schedules.length + 1
+  const remainAmount = Math.max(0, form.amount - schedulesSumAmount.value)
+  form.schedules.push({
+    id: `sch-${Date.now()}-${nextNum}`,
+    stageName: `第 ${nextNum} 期款`,
+    month: form.month || '',
+    status: form.status || 'E輸單',
+    amount: remainAmount,
+    cost: 0,
+    netRevenue: remainAmount
+  })
+}
+
+const removeScheduleRow = (idx) => {
+  form.schedules.splice(idx, 1)
+}
+
+const recalcScheduleNet = (sch) => {
+  sch.netRevenue = (Number(sch.amount) || 0) - (Number(sch.cost) || 0)
+}
+
+const getSchedulesTotalAmount = (schedules) => {
+  return (schedules || []).reduce((sum, s) => sum + (Number(s.amount) || 0), 0)
 }
 
 const openAddDialog = () => {
   isEditMode.value = false
-  Object.assign(form, defaultForm)
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  Object.assign(form, {
+    ...defaultForm,
+    month: currentMonth,
+    schedules: [
+      { id: 'sch-1', stageName: '單期全額', month: currentMonth, status: 'E輸單', amount: 0, cost: 0, netRevenue: 0 }
+    ]
+  })
   dialogVisible.value = true
 }
 
 const openEditDialog = (row) => {
   isEditMode.value = true
   currentEditId.value = row.id
-  Object.assign(form, row)
+  Object.assign(form, {
+    ...row,
+    schedules: (row.schedules && row.schedules.length > 0)
+      ? JSON.parse(JSON.stringify(row.schedules))
+      : [{ id: 'sch-1', stageName: '單期全額', month: row.month, status: row.status, amount: row.amount, cost: row.cost, netRevenue: row.netRevenue }]
+  })
   dialogVisible.value = true
 }
 
@@ -386,7 +534,16 @@ const updateDualSeal = async (row, val) => {
 }
 
 const submitForm = async () => {
-  if (!form.clientName || !form.month) return ElMessage.warning('請填寫客戶名稱與歸屬月份')
+  if (!form.clientName || !form.month) return ElMessage.warning('請填寫客戶名稱與合約月份')
+  if (!isSchedulesBalanced.value) {
+    return ElMessage.warning(`各期金額加總 ($${schedulesSumAmount.value.toLocaleString()}) 與合約總額 ($${Number(form.amount || 0).toLocaleString()}) 不符，請校對平衡！`)
+  }
+
+  // 自動彙總母單金額、成本與淨值
+  form.cost = form.schedules.reduce((sum, s) => sum + (Number(s.cost) || 0), 0)
+  form.netRevenue = form.schedules.reduce((sum, s) => sum + (Number(s.netRevenue) || 0), 0)
+  form.status = form.schedules[form.schedules.length - 1].status
+
   submitting.value = true
   if (isEditMode.value) {
     await salesStore.updateRecord(currentEditId.value, { ...form })
@@ -395,95 +552,50 @@ const submitForm = async () => {
   }
   submitting.value = false
   dialogVisible.value = false
-  ElMessage.success('業績紀錄已成功儲存！')
+  ElMessage.success('業績紀錄與跨月分期已成功儲存！')
 }
 
 const resetForm = () => {
   Object.assign(form, defaultForm)
 }
 
-// -------------------------------------------------------------
-// 功能 1：下載「業績紀錄匯入範本檔 (.xlsx)」(狀態使用代碼 A~G 範例)
-// -------------------------------------------------------------
+// 下載母子分期專用 Excel 範本
 const downloadTemplate = () => {
   const wb = XLSX.utils.book_new()
-
-  const templateHeaders = [
-    '歸屬月份 *', '客戶屬性 *', '客戶名稱 *', '產業類別', '專案名稱',
-    '產品名稱', '商機來源', '推進狀態(A~G) *', '合約總額 *', '成本金額',
-    '實際認列 *', '預計結案日', '雙用印完成', '備註說明'
+  const headers = [
+    '客戶名稱 *', '客戶屬性 *', '專案名稱 *', '產業類別', '產品名稱',
+    '商機來源', '合約總額 *', '期別名稱', '認列月份 *', '期別推進狀態(A~G) *',
+    '本期金額 *', '本期成本', '本期實際認列 *', '雙用印完成', '備註說明'
   ]
 
-  // 狀態欄直接展示 E, D, B 代碼
   const sampleData = [
-    templateHeaders
+    headers,
+    ['台灣積體光電股份有限公司', '新客', '年度智慧廠區弱電升級案', '半導體製造', '智慧物聯監控', '官網名單', 650000, '第一期(訂金30%)', '2026-10', 'E', 195000, 50000, 145000, '是', '首期款已撥付 (合約額>30萬需雙用印)'],
+    ['台灣積體光電股份有限公司', '新客', '年度智慧廠區弱電升級案', '半導體製造', '智慧物聯監控', '官網名單', 650000, '第二期(尾款70%)', '2026-12', 'D', 455000, 130000, 325000, '是', '合約審閱中，列入12月樂觀認列'],
+    ['大洋國際物流集團', '舊客', '雲端ERP模組擴充', '海空運承攬', '雲端企業版', '客戶續約', 280000, '單期全額', '2026-10', 'E', 280000, 60000, 220000, '否', '單期請款無分期']
   ]
 
-  const wsData = XLSX.utils.aoa_to_sheet(sampleData)
-  wsData['!cols'] = [
-    { wch: 14 }, { wch: 12 }, { wch: 26 }, { wch: 16 }, { wch: 26 },
-    { wch: 18 }, { wch: 15 }, { wch: 18 }, { wch: 14 }, { wch: 14 },
-    { wch: 14 }, { wch: 15 }, { wch: 12 }, { wch: 32 }
-  ]
-  XLSX.utils.book_append_sheet(wb, wsData, '業績紀錄匯入範本')
-
-  const instructionData = [
-    ['【SPM 業績管理系統】推進狀態代碼對照表與填寫規範'],
-    [],
-    ['狀態代碼', '系統對應階段名稱', '業績採計類別', '詳細說明'],
-    ['A', 'A初步洽談', '商機管線 (Pipeline)', '業務初步接洽與需求訪談'],
-    ['B', 'B報價中', '商機管線 (Pipeline)', '已正式提送報價單'],
-    ['C', 'C調整報價', '商機管線 (Pipeline)', '規格調整或價格協商中'],
-    ['D', 'D提供合約 (列入潛在業績)', '樂觀認列 (Optimistic)', '合約審閱待簽，納入樂觀達成率計算'],
-    ['E', 'E輸單', '實際達成 (Actual)', '合約正式簽妥成案，納入實際達成率 (30萬以上需雙用印)'],
-    ['F', 'F開發票 (列入實際達成)', '實際達成 (Actual)', '款項請領發票開立，納入實際達成率'],
-    ['G', 'G流單 (不列入計算)', '失效階段', '商機未成案或取消，不計入業績']
-  ]
-  const wsInstruction = XLSX.utils.aoa_to_sheet(instructionData)
-  wsInstruction['!cols'] = [{ wch: 12 }, { wch: 26 }, { wch: 22 }, { wch: 45 }]
-  XLSX.utils.book_append_sheet(wb, wsInstruction, '狀態代碼對照表')
-
-  XLSX.writeFile(wb, '業績紀錄匯入範本_SPM.xlsx')
-  ElMessage.success('已下載業績紀錄匯入範本檔！')
+  const ws = XLSX.utils.aoa_to_sheet(sampleData)
+  ws['!cols'] = [{ wch: 26 }, { wch: 12 }, { wch: 26 }, { wch: 15 }, { wch: 18 }, { wch: 14 }, { wch: 15 }, { wch: 18 }, { wch: 12 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 30 }]
+  XLSX.utils.book_append_sheet(wb, ws, '分期業績匯入範本')
+  XLSX.writeFile(wb, '母子合約跨月分期匯入範本_SPM.xlsx')
+  ElMessage.success('已下載母子分期專用範本檔！')
 }
 
-// -------------------------------------------------------------
-// 功能 2：Excel 檔案讀取 (狀態欄支援輸入 A~G 代碼或全名)
-// -------------------------------------------------------------
+// 匯入分期 Excel
 const openImportDialog = () => {
   parsedRecords.value = []
-  importErrors.value = []
   importDialogVisible.value = true
 }
 
 const resetImport = () => {
   parsedRecords.value = []
-  importErrors.value = []
   if (uploadRef.value) uploadRef.value.clearFiles()
 }
 
-const parseDate = (val) => {
-  if (!val) return null
-  if (typeof val === 'number') {
-    const utc_days = Math.floor(val - 25569)
-    const date_info = new Date(utc_days * 86400 * 1000)
-    return date_info.toISOString().slice(0, 10)
-  }
-  const str = String(val).trim()
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str
-  if (/^\d{4}\/\d{2}\/\d{2}$/.test(str)) return str.replace(/\//g, '-')
-  return str
-}
-
-const parseMonth = (val) => {
-  if (!val) return ''
-  const parsed = parseDate(val)
-  if (parsed && parsed.length >= 7) return parsed.slice(0, 7)
-  const str = String(val).trim()
-  if (/^\d{4}-\d{2}$/.test(str)) return str
-  if (/^\d{4}\/\d{2}$/.test(str)) return str.replace('/', '-')
-  return str
-}
+const parsedTotalSchedules = computed(() => {
+  return parsedRecords.value.reduce((sum, r) => sum + (r.schedules?.length || 0), 0)
+})
 
 const handleFileChange = (uploadFile) => {
   const file = uploadFile.raw
@@ -494,19 +606,13 @@ const handleFileChange = (uploadFile) => {
     try {
       const data = new Uint8Array(e.target.result)
       const workbook = XLSX.read(data, { type: 'array' })
-      const firstSheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[firstSheetName]
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
       const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
-
-      if (rawRows.length < 2) {
-        ElMessage.error('檔案內無有效資料列')
-        return
-      }
 
       let headerRowIdx = 0
       for (let i = 0; i < Math.min(rawRows.length, 5); i++) {
         const rowStr = (rawRows[i] || []).join(',')
-        if (rowStr.includes('月份') || rowStr.includes('客戶') || rowStr.includes('狀態')) {
+        if (rowStr.includes('客戶') || rowStr.includes('專案')) {
           headerRowIdx = i
           break
         }
@@ -516,144 +622,134 @@ const handleFileChange = (uploadFile) => {
       const rows = rawRows.slice(headerRowIdx + 1)
 
       const findColIdx = (keyword) => headers.findIndex(h => h && String(h).includes(keyword))
-      const idxMonth = findColIdx('月份')
-      const idxType = findColIdx('屬性')
       const idxName = findColIdx('客戶名稱')
-      const idxIndustry = findColIdx('產業')
+      const idxType = findColIdx('屬性')
       const idxProject = findColIdx('專案')
+      const idxIndustry = findColIdx('產業')
       const idxProduct = findColIdx('產品')
       const idxSource = findColIdx('商機')
+      const idxTotalAmount = findColIdx('合約總額')
+      const idxStageName = findColIdx('期別')
+      const idxMonth = findColIdx('月份')
       const idxStatus = findColIdx('狀態')
-      const idxAmount = findColIdx('合約')
-      const idxCost = findColIdx('成本')
+      const idxAmount = findColIdx('本期金額')
+      const idxCost = findColIdx('本期成本')
       const idxNet = findColIdx('認列')
-      const idxDate = findColIdx('結案')
       const idxDual = findColIdx('雙用印')
       const idxNotes = findColIdx('備註')
 
-      const validList = []
-      const errList = []
+      const contractMap = new Map()
 
-      rows.forEach((row, rowNum) => {
+      rows.forEach((row) => {
         if (!row || row.length === 0 || row.every(c => c === undefined || c === '')) return
 
-        const rowLine = rowNum + headerRowIdx + 2
-        const rawMonth = idxMonth !== -1 ? parseMonth(row[idxMonth]) : ''
         const clientName = idxName !== -1 ? String(row[idxName] || '').trim() : ''
-        const rawType = idxType !== -1 ? String(row[idxType] || '').trim() : '新客'
-        const rawStatus = idxStatus !== -1 ? String(row[idxStatus] || '').trim() : ''
-        const amount = idxAmount !== -1 ? Number(row[idxAmount]) || 0 : 0
-        const cost = idxCost !== -1 ? Number(row[idxCost]) || 0 : 0
-        let netRevenue = idxNet !== -1 ? Number(row[idxNet]) : 0
-        if (isNaN(netRevenue) || netRevenue === 0) {
-          netRevenue = amount - cost
-        }
+        const projectName = idxProject !== -1 ? String(row[idxProject] || '').trim() : ''
+        if (!clientName) return
 
-        // 1. 必填檢核：月份與客戶名稱
-        if (!rawMonth) {
-          errList.push(`第 ${rowLine} 列：歸屬月份不能為空`)
-          return
-        }
-        if (!clientName) {
-          errList.push(`第 ${rowLine} 列：客戶名稱不能為空`)
-          return
-        }
+        const groupKey = `${clientName}___${projectName}`
+        const rawMonth = idxMonth !== -1 ? String(row[idxMonth] || '').trim().slice(0, 7) : ''
+        const rawStatus = idxStatus !== -1 ? String(row[idxStatus] || '').trim() : 'E'
+        const cleanCode = rawStatus.toUpperCase().charAt(0)
+        const status = STATUS_CODE_MAP[cleanCode] || 'E輸單'
 
-        // 2. 狀態代碼解析 (支援 A、B、C、D、E、F、G 及小寫 a~g 或全稱)
-        const cleanStatusCode = rawStatus.toUpperCase().charAt(0)
-        let status = STATUS_CODE_MAP[cleanStatusCode]
+        const schAmount = idxAmount !== -1 ? Number(row[idxAmount]) || 0 : 0
+        const schCost = idxCost !== -1 ? Number(row[idxCost]) || 0 : 0
+        const schNet = idxNet !== -1 ? Number(row[idxNet]) || (schAmount - schCost) : (schAmount - schCost)
 
-        if (!status) {
-          errList.push(`第 ${rowLine} 列：推進狀態「${rawStatus || '空白'}」無效，請輸入代碼 A、B、C、D、E、F、G`)
-          return
-        }
-
-        // 3. 雙用印判斷
-        const dualStr = idxDual !== -1 ? String(row[idxDual] || '').trim() : ''
-        const isDualSealCompleted = dualStr === '是' || dualStr.toLowerCase() === 'true'
-
-        validList.push({
+        const scheduleItem = {
+          id: `sch-${Math.random().toString(36).substr(2, 9)}`,
+          stageName: idxStageName !== -1 ? String(row[idxStageName] || '分期款').trim() : '分期款',
           month: rawMonth,
-          clientType: rawType.includes('舊') ? '舊客' : '新客',
-          clientName,
-          industry: idxIndustry !== -1 ? String(row[idxIndustry] || '').trim() : '',
-          projectName: idxProject !== -1 ? String(row[idxProject] || '').trim() : '',
-          productName: idxProduct !== -1 ? String(row[idxProduct] || '').trim() : '',
-          source: idxSource !== -1 ? String(row[idxSource] || '').trim() : '',
           status,
-          amount,
-          cost,
-          netRevenue,
-          expectedDate: idxDate !== -1 ? parseDate(row[idxDate]) : null,
-          notes: idxNotes !== -1 ? String(row[idxNotes] || '').trim() : '',
-          isDualSealCompleted
-        })
+          amount: schAmount,
+          cost: schCost,
+          netRevenue: schNet
+        }
+
+        if (!contractMap.has(groupKey)) {
+          const dualStr = idxDual !== -1 ? String(row[idxDual] || '').trim() : ''
+          contractMap.set(groupKey, {
+            month: rawMonth,
+            clientName,
+            clientType: idxType !== -1 && String(row[idxType]).includes('舊') ? '舊客' : '新客',
+            projectName,
+            industry: idxIndustry !== -1 ? String(row[idxIndustry] || '').trim() : '',
+            productName: idxProduct !== -1 ? String(row[idxProduct] || '').trim() : '',
+            source: idxSource !== -1 ? String(row[idxSource] || '').trim() : '',
+            amount: idxTotalAmount !== -1 ? Number(row[idxTotalAmount]) || 0 : schAmount,
+            cost: 0,
+            netRevenue: 0,
+            status,
+            notes: idxNotes !== -1 ? String(row[idxNotes] || '').trim() : '',
+            isDualSealCompleted: dualStr === '是' || dualStr.toLowerCase() === 'true',
+            schedules: [scheduleItem]
+          })
+        } else {
+          contractMap.get(groupKey).schedules.push(scheduleItem)
+        }
       })
 
-      parsedRecords.value = validList
-      importErrors.value = errList
+      const result = []
+      contractMap.forEach(parent => {
+        parent.cost = parent.schedules.reduce((sum, s) => sum + s.cost, 0)
+        parent.netRevenue = parent.schedules.reduce((sum, s) => sum + s.netRevenue, 0)
+        if (!parent.amount || parent.amount === 0) {
+          parent.amount = parent.schedules.reduce((sum, s) => sum + s.amount, 0)
+        }
+        parent.status = parent.schedules[parent.schedules.length - 1].status
+        result.push(parent)
+      })
 
-      if (validList.length === 0) {
-        ElMessage.warning('未能成功解析任何有效業績資料，請檢查欄位格式')
-      } else {
-        ElMessage.success(`成功讀取 ${validList.length} 筆資料！`)
+      parsedRecords.value = result
+      if (result.length > 0) {
+        ElMessage.success(`成功解析 ${result.length} 筆合約（共含 ${parsedTotalSchedules.value} 個分期）！`)
       }
     } catch (err) {
       console.error(err)
-      ElMessage.error('解析 Excel 檔案失敗，請確認檔案格式')
+      ElMessage.error('解析 Excel 檔案失敗，請檢查格式')
     }
   }
   reader.readAsArrayBuffer(file)
 }
 
-// 確認批次寫入
 const confirmBatchImport = async () => {
   if (parsedRecords.value.length === 0) return
-
-  try {
-    await ElMessageBox.confirm(
-      `確定要將解析出的 ${parsedRecords.value.length} 筆業績紀錄正式寫入系統嗎？`,
-      '批次匯入確認',
-      { confirmButtonText: '確定匯入', cancelButtonText: '取消', type: 'info' }
-    )
-
-    importing.value = true
-    for (const record of parsedRecords.value) {
-      await salesStore.addRecord(record)
-    }
-    importing.value = false
-    importDialogVisible.value = false
-    ElMessage.success(`🎉 成功匯入 ${parsedRecords.value.length} 筆業績紀錄！`)
-  } catch (e) {
-    importing.value = false
+  importing.value = true
+  for (const record of parsedRecords.value) {
+    await salesStore.addRecord(record)
   }
+  importing.value = false
+  importDialogVisible.value = false
+  ElMessage.success(`🎉 成功匯入 ${parsedRecords.value.length} 筆合約紀錄！`)
 }
 
-// 匯出 CSV 報表
 const exportCSV = () => {
-  if (filteredTableData.value.length === 0) return ElMessage.warning('無資料可匯出')
-  const headers = ['歸屬月份', '客戶名稱', '產業類別', '專案名稱', '產品名稱', '商機來源', '客戶屬性', '狀態', '合約金額', '成本', '實際認列', '預計結案日', '雙用印完成']
-  const rows = filteredTableData.value.map(r => [
-    r.month,
-    r.clientName,
-    r.industry || '',
-    r.projectName || '',
-    r.productName || '',
-    r.source || '',
-    r.clientType,
-    r.status,
-    r.amount,
-    r.cost,
-    r.netRevenue,
-    r.expectedDate || '',
-    r.isDualSealCompleted ? '是' : '否'
-  ])
+  if (salesStore.records.length === 0) return ElMessage.warning('無資料可匯出')
+  const headers = ['客戶名稱', '客戶屬性', '專案名稱', '合約總額', '期別名稱', '認列月份', '期別狀態', '本期金額', '本期認列毛利', '雙用印完成']
+  const rows = []
+  salesStore.records.forEach(p => {
+    (p.schedules || []).forEach(s => {
+      rows.push([
+        p.clientName,
+        p.clientType,
+        p.projectName || '',
+        p.amount,
+        s.stageName,
+        s.month,
+        s.status,
+        s.amount,
+        s.netRevenue,
+        p.isDualSealCompleted ? '是' : '否'
+      ])
+    })
+  })
   let csv = '\uFEFF' + headers.join(',') + '\n' + rows.map(e => e.join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `業績報表_${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `合約分期報表_${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
 }
 </script>
@@ -661,7 +757,61 @@ const exportCSV = () => {
 <style scoped>
 .records-container { width: 100%; }
 
-/* 匯入對話框樣式 */
+.expand-schedule-box {
+  background: #f8fbff;
+  border: 1px dashed #cde3fd;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 6px 10px;
+}
+.esb-head { display: flex; justify-content: space-between; align-items: center; }
+.esb-title { font-weight: bold; color: #3b6ba8; font-size: 13px; }
+.esb-sum { font-size: 12px; color: #6b89a8; }
+
+.schedules-editor-card {
+  background: #fdfefe;
+  border: 1.5px solid #ddecfe;
+  border-radius: 14px;
+  padding: 14px;
+  margin-top: 10px;
+}
+.sec-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.sec-title { font-weight: bold; color: #3d5a80; font-size: 14px; }
+.sec-badge { font-size: 11px; background: #eaf3fe; color: #518de1; padding: 2px 8px; border-radius: 10px; margin-left: 6px; }
+
+.schedule-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: #f8fbfe;
+  border: 1px solid #e7f2fe;
+  padding: 8px 10px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+.sir-cell { display: flex; flex-direction: column; gap: 4px; }
+.sir-label { font-size: 11px; color: #7a94b0; font-weight: bold; }
+.sir-net { font-size: 13px; font-weight: bold; color: #f28b9c; height: 28px; display: flex; align-items: center; }
+.sir-action { display: flex; align-items: center; height: 28px; }
+
+.schedules-balance-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff3f5;
+  border: 1px dashed #ffd5de;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #d1274c;
+  margin-top: 10px;
+}
+.schedules-balance-bar.is-balanced {
+  background: #f0faf4;
+  border-color: #c3ebd2;
+  color: #217346;
+}
+
 .import-tip-box {
   background-color: #f3f8fe;
   border: 1px dashed #c9e1fe;
@@ -673,29 +823,11 @@ const exportCSV = () => {
   line-height: 1.6;
 }
 .import-tip-box p { margin: 2px 0; }
-
-.import-preview-box {
-  margin-top: 14px;
-}
-.import-error-list {
-  max-height: 100px;
-  overflow-y: auto;
-  margin-top: 8px;
-  background: #fff8f8;
-  padding: 8px;
-  border-radius: 8px;
-  border: 1px solid #fedfe2;
-  font-size: 12px;
-  color: #d9534f;
-}
-.err-item { margin-bottom: 3px; }
-
-/* 手機版卡片 */
 .mobile-record-card {
   background: #ffffff;
   border-radius: 14px;
   padding: 14px;
-  border: 1px solid #e7f5fe;
+  border: 1.5px solid #e7f5fe;
   box-shadow: 0 2px 10px rgba(140, 187, 241, 0.08);
 }
 .m-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -714,7 +846,16 @@ const exportCSV = () => {
   margin: 8px 0;
 }
 .revenue-val { color: #f28b9c; font-size: 18px; }
-.m-meta-row { display: flex; gap: 15px; font-size: 12px; color: #a1b5c9; }
+.m-schedules-list {
+  background: #fafcfe;
+  border: 1px dashed #dbeafe;
+  border-radius: 8px;
+  padding: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.ms-title { font-weight: bold; color: #518de1; margin-bottom: 4px; }
+.ms-item { display: flex; justify-content: space-between; color: #555; margin-bottom: 2px; }
 .m-dual-row { padding: 8px 0; border-top: 1px dashed #f0f7ff; margin-top: 8px; }
 .m-footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 8px; border-top: 1px solid #f8fbff; }
 </style>

@@ -165,7 +165,7 @@
             <template #default="scope"><strong>{{ scope.row.month }}</strong></template>
           </el-table-column>
 
-          <!-- 1. 總體業績指標 (5 欄，淺藍底色，無排序) -->
+          <!-- 1. 總體業績指標 -->
           <el-table-column label="總體業績指標" align="center" class-name="header-total-group">
             <el-table-column prop="totalTarget" label="總目標" align="right" width="115" class-name="col-total">
               <template #default="scope">$ {{ scope.row.totalTarget.toLocaleString() }}</template>
@@ -192,7 +192,7 @@
             </el-table-column>
           </el-table-column>
 
-          <!-- 2. 新客指標 (5 欄，淺綠底色，無排序) -->
+          <!-- 2. 新客指標 -->
           <el-table-column label="新客指標" align="center" class-name="header-new-group">
             <el-table-column prop="newTarget" label="目標" align="right" width="110" class-name="col-new">
               <template #default="scope">$ {{ scope.row.newTarget.toLocaleString() }}</template>
@@ -217,7 +217,7 @@
             </el-table-column>
           </el-table-column>
 
-          <!-- 3. 舊客指標 (5 欄，淺紫底色，無排序) -->
+          <!-- 3. 舊客指標 -->
           <el-table-column label="舊客指標" align="center" class-name="header-existing-group">
             <el-table-column prop="existingTarget" label="目標" align="right" width="110" class-name="col-existing">
               <template #default="scope">$ {{ scope.row.existingTarget.toLocaleString() }}</template>
@@ -295,7 +295,7 @@
       </div>
     </el-card>
 
-    <!-- 【模式 B：單月檢視】展示當月案件推進明細列表 (僅屬性、狀態、金額、實際認列可排序) -->
+    <!-- 【模式 B：單月檢視】展示當月案件推進明細列表 -->
     <template v-else>
       <el-card shadow="hover" class="section-card">
         <template #header>
@@ -311,31 +311,27 @@
             <el-table-column prop="month" label="歸屬月份" width="105" align="center" />
             <el-table-column prop="clientName" label="客戶名稱" width="130" show-overflow-tooltip />
             <el-table-column prop="projectName" label="專案名稱" min-width="140" show-overflow-tooltip />
-            <!-- 排序欄位 1: 屬性 -->
             <el-table-column prop="clientType" label="屬性" width="90" align="center" sortable>
               <template #default="scope">
                 <el-tag :type="scope.row.clientType === '新客' ? 'primary' : 'success'" round size="small">{{ scope.row.clientType }}</el-tag>
               </template>
             </el-table-column>
-            <!-- 排序欄位 2: 狀態 -->
             <el-table-column prop="status" label="狀態" width="130" align="center" sortable>
               <template #default="scope">
                 <el-tag :type="getStatusColor(scope.row.status)" effect="dark" round size="small">{{ scope.row.status }}</el-tag>
               </template>
             </el-table-column>
-            <!-- 排序欄位 3: 合約金額 -->
             <el-table-column prop="amount" label="合約金額" align="right" width="120" sortable>
-              <template #default="scope">$ {{ scope.row.amount.toLocaleString() }}</template>
+              <template #default="scope">$ {{ Number(scope.row.amount || 0).toLocaleString() }}</template>
             </el-table-column>
-            <!-- 排序欄位 4: 實際認列 -->
             <el-table-column prop="netRevenue" label="實際認列" align="right" width="125" sortable>
               <template #default="scope">
-                <strong style="color: #f28b9c;">$ {{ scope.row.netRevenue.toLocaleString() }}</strong>
+                <strong style="color: #f28b9c;">$ {{ Number(scope.row.netRevenue || 0).toLocaleString() }}</strong>
               </template>
             </el-table-column>
             <el-table-column label="雙用印" width="100" align="center">
               <template #default="scope">
-                <div v-if="scope.row.amount > 300000 && scope.row.status.includes('E輸單')">
+                <div v-if="Number(scope.row.amount) > 300000 && scope.row.status.includes('輸單')">
                   <el-checkbox v-model="scope.row.isDualSealCompleted" @change="(val) => updateDualSeal(scope.row, val)">
                     <span :style="{ color: scope.row.isDualSealCompleted ? '#83cbb1' : '#f28b9c', fontWeight: 'bold' }">
                       {{ scope.row.isDualSealCompleted ? '已完成' : '待申請' }}
@@ -363,10 +359,10 @@
             <p class="mdrc-project">專案：{{ item.projectName || '未填寫' }}</p>
             <div class="mdrc-revenue-box">
               <span>實際認列：</span>
-              <strong class="revenue-val">$ {{ item.netRevenue.toLocaleString() }}</strong>
+              <strong class="revenue-val">$ {{ Number(item.netRevenue || 0).toLocaleString() }}</strong>
             </div>
-            <div class="mdrc-sub">合約金額：${{ item.amount.toLocaleString() }}</div>
-            <div class="mdrc-dual" v-if="item.amount > 300000 && item.status.includes('E輸單')">
+            <div class="mdrc-sub">合約金額：${{ Number(item.amount || 0).toLocaleString() }}</div>
+            <div class="mdrc-dual" v-if="Number(item.amount) > 300000 && item.status.includes('輸單')">
               <el-checkbox v-model="item.isDualSealCompleted" @change="(val) => updateDualSeal(item, val)">
                 雙用印：{{ item.isDualSealCompleted ? '已完成' : '待申請' }}
               </el-checkbox>
@@ -375,7 +371,7 @@
         </div>
       </el-card>
 
-      <!-- 6. 雙用印待辦追蹤專區 (移至單月檢視最下方) -->
+      <!-- 6. 雙用印待辦追蹤專區 -->
       <el-card shadow="hover" class="section-card alert-card">
         <template #header>
           <div class="section-title text-alert">
@@ -395,7 +391,7 @@
             <el-table-column prop="projectName" label="專案名稱" min-width="160" />
             <el-table-column prop="amount" label="合約金額" align="right" width="130">
               <template #default="scope">
-                <strong style="color: #f28b9c;">$ {{ scope.row.amount.toLocaleString() }}</strong>
+                <strong style="color: #f28b9c;">$ {{ Number(scope.row.amount || 0).toLocaleString() }}</strong>
               </template>
             </el-table-column>
             <el-table-column label="雙用印狀態" width="130" align="center">
@@ -412,7 +408,7 @@
           <div v-for="item in pendingDualSeals" :key="item.id" class="mobile-dual-card">
             <div class="mdc-head">
               <span class="mdc-month">📅 {{ item.month }}</span>
-              <span class="mdc-amount">$ {{ item.amount.toLocaleString() }}</span>
+              <span class="mdc-amount">$ {{ Number(item.amount || 0).toLocaleString() }}</span>
             </div>
             <div class="mdc-client">{{ item.clientName }}</div>
             <div class="mdc-project">專案：{{ item.projectName || '未填寫' }}</div>
@@ -437,20 +433,16 @@ import { ElMessage } from 'element-plus'
 const salesStore = useSalesStore()
 const router = useRouter()
 
-// 需求 1: 預設為單月檢視
 const viewMode = ref('single')
 
-// 依檢視模式切換業績記錄清單
 const currentRecords = computed(() => {
   return viewMode.value === 'single' ? salesStore.singleFilteredRecords : salesStore.filteredRecords
 })
 
-// 依檢視模式切換目標
 const currentTargetData = computed(() => {
   return viewMode.value === 'single' ? salesStore.singleTarget : salesStore.currentTarget
 })
 
-// 營收數值
 const currentActualRevenue = computed(() => {
   return viewMode.value === 'single' ? salesStore.singleActualRevenue : salesStore.actualRevenue
 })
@@ -464,7 +456,6 @@ const currentExistingRevenue = computed(() => {
   return viewMode.value === 'single' ? salesStore.singleExistingClientRevenue : salesStore.existingClientRevenue
 })
 
-// 達成率計算輔助函式
 const calcRate = (val, target) => {
   if (!target || target === 0) return 0
   return Math.round((val / target) * 100)
@@ -474,19 +465,18 @@ const totalAchieveRate = computed(() => calcRate(currentActualRevenue.value, cur
 const newAchieveRate = computed(() => calcRate(currentNewRevenue.value, currentTargetData.value.newClient))
 const existingAchieveRate = computed(() => calcRate(currentExistingRevenue.value, currentTargetData.value.existingClient))
 
-// 狀態標籤顏色
 const getStatusColor = (status) => {
+  if (!status) return 'info'
   if (status.includes('輸單') || status.includes('開發票')) return 'success'
   if (status.includes('流單')) return 'info'
   return 'warning'
 }
 
-// Pipeline 筆數
 const pipelineCount = computed(() => {
-  return currentRecords.value.filter(r => r.status.includes('洽談') || r.status.includes('報價') || r.status.includes('提供合約')).length
+  const items = viewMode.value === 'single' ? salesStore.singleScheduleItems : salesStore.rangeScheduleItems
+  return items.filter(r => r.status.includes('洽談') || r.status.includes('報價') || r.status.includes('提供合約')).length
 })
 
-// 推進階段摘要 (Funnel)
 const stageSummary = computed(() => {
   const stages = [
     { name: 'A初步洽談', class: 'st-talk' },
@@ -495,21 +485,19 @@ const stageSummary = computed(() => {
     { name: 'D提供合約', class: 'st-contract' },
     { name: 'E輸單(已簽約)', class: 'st-won' },
     { name: 'F開發票', class: 'st-invoice' }
-    
   ]
+  const items = viewMode.value === 'single' ? salesStore.singleScheduleItems : salesStore.rangeScheduleItems
   return stages.map(s => {
-    const list = currentRecords.value.filter(r => r.status.includes(s.name.slice(0, 2)))
+    const list = items.filter(r => r.status.includes(s.name.slice(0, 2)))
     const amount = list.reduce((sum, r) => sum + (Number(r.netRevenue) || 0), 0)
     return { name: s.name, count: list.length, amount, class: s.class }
   })
 })
 
-// 30 萬以上且未雙用印清單
 const pendingDualSeals = computed(() => {
   return currentRecords.value.filter(r => Number(r.amount) > 300000 && r.status.includes('輸單') && !r.isDualSealCompleted)
 })
 
-// 需求 4: 點前往完整總表時，自動帶入該月份參數
 const goToRecordsWithMonth = () => {
   router.push({
     path: '/records',
@@ -517,7 +505,6 @@ const goToRecordsWithMonth = () => {
   })
 }
 
-// 區間內月份列表
 const monthsInRange = computed(() => {
   if (!salesStore.dashboardDateRange || salesStore.dashboardDateRange.length !== 2) return []
   const [start, end] = salesStore.dashboardDateRange
@@ -539,13 +526,16 @@ const monthsInRange = computed(() => {
   return result
 })
 
+// 維持原本所有計算公式：
 const monthlyBreakdown = computed(() => {
   return monthsInRange.value.map(m => {
     const target = salesStore.targets[m] || { total: 0, newClient: 0, existingClient: 0 }
-    const monthRecords = salesStore.records.filter(r => r.month === m)
+    
+    // 取出所屬該月份的期別項目
+    const monthItems = salesStore.allScheduleItems.filter(i => i.month === m)
 
-    const actualRecords = monthRecords.filter(r => r.status.includes('輸單') || r.status.includes('開發票'))
-    const pipelineRecords = monthRecords.filter(r => r.status.includes('提供合約'))
+    const actualRecords = monthItems.filter(r => r.status.includes('輸單') || r.status.includes('開發票'))
+    const pipelineRecords = monthItems.filter(r => r.status.includes('提供合約'))
 
     const totalActual = actualRecords.reduce((sum, r) => sum + (Number(r.netRevenue) || 0), 0)
     const totalPipeline = pipelineRecords.reduce((sum, r) => sum + (Number(r.netRevenue) || 0), 0)

@@ -28,11 +28,60 @@ export const useSalesStore = defineStore('sales', {
   },
   
   getters: {
+    // 輔助將所有合約展開為期別項目 (向下相容無分期的舊資料)
+    allScheduleItems(state) {
+      const items = []
+      state.records.forEach(r => {
+        const schedules = (r.schedules && r.schedules.length > 0)
+          ? r.schedules
+          : [{
+              id: `${r.id}-default`,
+              stageName: '單期全額',
+              month: r.month,
+              status: r.status,
+              amount: r.amount,
+              cost: r.cost,
+              netRevenue: r.netRevenue
+            }]
+
+        schedules.forEach(sch => {
+          items.push({
+            parentId: r.id,
+            clientName: r.clientName,
+            clientType: r.clientType,
+            projectName: r.projectName,
+            parentTotalAmount: r.amount,
+            isDualSealCompleted: r.isDualSealCompleted,
+            stageName: sch.stageName || '分期款',
+            month: sch.month || r.month,
+            status: sch.status || r.status,
+            amount: Number(sch.amount) || 0,
+            cost: Number(sch.cost) || 0,
+            netRevenue: Number(sch.netRevenue) || 0
+          })
+        })
+      })
+      return items
+    },
+
+    // 區間內篩選紀錄 (只要任一期別在區間內即納入)
     filteredRecords(state) {
       if (!state.dashboardDateRange || state.dashboardDateRange.length !== 2) return state.records
       const [start, end] = state.dashboardDateRange
-      return state.records.filter(r => r.month >= start && r.month <= end)
+      return state.records.filter(r => {
+        if (r.schedules && r.schedules.length > 0) {
+          return r.schedules.some(s => s.month >= start && s.month <= end)
+        }
+        return r.month >= start && r.month <= end
+      })
     },
+
+    rangeScheduleItems() {
+      if (!this.dashboardDateRange || this.dashboardDateRange.length !== 2) return this.allScheduleItems
+      const [start, end] = this.dashboardDateRange
+      return this.allScheduleItems.filter(i => i.month >= start && i.month <= end)
+    },
+
     currentTarget(state) {
       let total = 0, newClient = 0, existingClient = 0
       if (state.dashboardDateRange && state.dashboardDateRange.length === 2) {
@@ -47,23 +96,55 @@ export const useSalesStore = defineStore('sales', {
       }
       return { total, newClient, existingClient }
     },
-    actualRevenue() { return this.filteredRecords.filter(r => r.status.includes('輸單') || r.status.includes('開發票')).reduce((sum, r) => sum + r.netRevenue, 0) },
-    pipelineRevenue() { return this.filteredRecords.filter(r => r.status.includes('洽談') || r.status.includes('報價') || r.status.includes('提供合約')).reduce((sum, r) => sum + r.netRevenue, 0) },
-    newClientRevenue() { return this.filteredRecords.filter(r => (r.status.includes('輸單') || r.status.includes('開發票')) && r.clientType === '新客').reduce((sum, r) => sum + r.netRevenue, 0) },
-    existingClientRevenue() { return this.filteredRecords.filter(r => (r.status.includes('輸單') || r.status.includes('開發票')) && r.clientType === '舊客').reduce((sum, r) => sum + r.netRevenue, 0) },
 
+    // 區間計算邏輯保持原狀：
+    actualRevenue() { 
+      return this.rangeScheduleItems.filter(r => r.status.includes('輸單') || r.status.includes('開發票')).reduce((sum, r) => sum + r.netRevenue, 0) 
+    },
+    pipelineRevenue() { 
+      return this.rangeScheduleItems.filter(r => r.status.includes('洽談') || r.status.includes('報價') || r.status.includes('提供合約')).reduce((sum, r) => sum + r.netRevenue, 0) 
+    },
+    newClientRevenue() { 
+      return this.rangeScheduleItems.filter(r => (r.status.includes('輸單') || r.status.includes('開發票')) && r.clientType === '新客').reduce((sum, r) => sum + r.netRevenue, 0) 
+    },
+    existingClientRevenue() { 
+      return this.rangeScheduleItems.filter(r => (r.status.includes('輸單') || r.status.includes('開發票')) && r.clientType === '舊客').reduce((sum, r) => sum + r.netRevenue, 0) 
+    },
+
+    // 單月檢視
     singleFilteredRecords(state) {
       if (!state.dashboardSingleMonth) return []
-      return state.records.filter(r => r.month === state.dashboardSingleMonth)
+      return state.records.filter(r => {
+        if (r.schedules && r.schedules.length > 0) {
+          return r.schedules.some(s => s.month === state.dashboardSingleMonth)
+        }
+        return r.month === state.dashboardSingleMonth
+      })
     },
+
+    singleScheduleItems() {
+      if (!this.dashboardSingleMonth) return []
+      return this.allScheduleItems.filter(i => i.month === this.dashboardSingleMonth)
+    },
+
     singleTarget(state) {
       if (!state.dashboardSingleMonth) return { total: 0, newClient: 0, existingClient: 0 }
       return state.targets[state.dashboardSingleMonth] || { total: 0, newClient: 0, existingClient: 0 }
     },
-    singleActualRevenue() { return this.singleFilteredRecords.filter(r => r.status.includes('輸單') || r.status.includes('開發票')).reduce((sum, r) => sum + r.netRevenue, 0) },
-    singlePipelineRevenue() { return this.singleFilteredRecords.filter(r => r.status.includes('洽談') || r.status.includes('報價') || r.status.includes('提供合約')).reduce((sum, r) => sum + r.netRevenue, 0) },
-    singleNewClientRevenue() { return this.singleFilteredRecords.filter(r => (r.status.includes('輸單') || r.status.includes('開發票')) && r.clientType === '新客').reduce((sum, r) => sum + r.netRevenue, 0) },
-    singleExistingClientRevenue() { return this.singleFilteredRecords.filter(r => (r.status.includes('輸單') || r.status.includes('開發票')) && r.clientType === '舊客').reduce((sum, r) => sum + r.netRevenue, 0) }
+
+    // 單月計算邏輯保持原狀：
+    singleActualRevenue() { 
+      return this.singleScheduleItems.filter(r => r.status.includes('輸單') || r.status.includes('開發票')).reduce((sum, r) => sum + r.netRevenue, 0) 
+    },
+    singlePipelineRevenue() { 
+      return this.singleScheduleItems.filter(r => r.status.includes('洽談') || r.status.includes('報價') || r.status.includes('提供合約')).reduce((sum, r) => sum + r.netRevenue, 0) 
+    },
+    singleNewClientRevenue() { 
+      return this.singleScheduleItems.filter(r => (r.status.includes('輸單') || r.status.includes('開發票')) && r.clientType === '新客').reduce((sum, r) => sum + r.netRevenue, 0) 
+    },
+    singleExistingClientRevenue() { 
+      return this.singleScheduleItems.filter(r => (r.status.includes('輸單') || r.status.includes('開發票')) && r.clientType === '舊客').reduce((sum, r) => sum + r.netRevenue, 0) 
+    }
   },
 
   actions: {
@@ -123,13 +204,12 @@ export const useSalesStore = defineStore('sales', {
 
     async handleGoogleCallback() {
       try {
-        // 強制解析網址中的 hash (包含 access_token)
         if (window.location.hash.includes('access_token')) {
           await supabase.auth.getSession()
         }
 
         const { data: { session }, error } = await supabase.auth.getSession()
-        if (error || !session) return false // 尚未完成回調
+        if (error || !session) return false
 
         const googleUser = session.user
         const email = googleUser.email
@@ -159,7 +239,7 @@ export const useSalesStore = defineStore('sales', {
         window.history.replaceState({}, document.title, window.location.pathname)
         await this.fetchAppData()
         
-        return true // 成功登入
+        return true
       } catch (error) {
         console.error('Google 登入回調處理失敗', error)
         return false
@@ -199,12 +279,32 @@ export const useSalesStore = defineStore('sales', {
           productName: r.product_name,
           source: r.source,
           status: r.status,
-          amount: Number(r.amount),
-          cost: Number(r.cost),
-          netRevenue: Number(r.net_revenue),
+          amount: Number(r.amount) || 0,
+          cost: Number(r.cost) || 0,
+          netRevenue: Number(r.net_revenue) || 0,
           expectedDate: r.expected_date,
           notes: r.notes,
-          isDualSealCompleted: Boolean(r.is_dual_seal_completed)
+          isDualSealCompleted: Boolean(r.is_dual_seal_completed),
+          // 解析分期 schedules (向下相容)
+          schedules: (r.schedules && Array.isArray(r.schedules) && r.schedules.length > 0)
+            ? r.schedules.map(s => ({
+                id: s.id || Math.random().toString(36).substr(2, 9),
+                stageName: s.stageName || '分期款',
+                month: s.month || r.month,
+                status: s.status || r.status,
+                amount: Number(s.amount) || 0,
+                cost: Number(s.cost) || 0,
+                netRevenue: Number(s.netRevenue) || 0
+              }))
+            : [{
+                id: `${r.id}-default`,
+                stageName: '單期全額',
+                month: r.month,
+                status: r.status,
+                amount: Number(r.amount) || 0,
+                cost: Number(r.cost) || 0,
+                netRevenue: Number(r.net_revenue) || 0
+              }]
         }))
 
         const rawTargets = await api.getTargets(this.currentUser.id)
@@ -250,7 +350,8 @@ export const useSalesStore = defineStore('sales', {
           net_revenue: recordForm.netRevenue,
           expected_date: recordForm.expectedDate || null,
           notes: recordForm.notes,
-          is_dual_seal_completed: recordForm.isDualSealCompleted
+          is_dual_seal_completed: recordForm.isDualSealCompleted,
+          schedules: recordForm.schedules || []
         }
 
         const res = await api.createRecord(payload)
@@ -277,7 +378,8 @@ export const useSalesStore = defineStore('sales', {
           net_revenue: updatedForm.netRevenue,
           expected_date: updatedForm.expectedDate || null,
           notes: updatedForm.notes,
-          is_dual_seal_completed: updatedForm.isDualSealCompleted
+          is_dual_seal_completed: updatedForm.isDualSealCompleted,
+          schedules: updatedForm.schedules || []
         }
 
         await api.updateRecord(id, payload)
