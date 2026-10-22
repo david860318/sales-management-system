@@ -4,7 +4,7 @@
     <!-- 搜尋條件卡片 -->
     <el-card shadow="never" class="search-card" style="margin-bottom: 16px;">
       <el-form :inline="true" :model="searchForm">
-        <el-form-item label="歸屬月份">
+        <el-form-item label="進件月份">
           <el-date-picker v-model="searchForm.dateRange" type="monthrange" range-separator="至" start-placeholder="開始" end-placeholder="結束" value-format="YYYY-MM" />
         </el-form-item>
         <el-form-item label="客戶名稱">
@@ -89,7 +89,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="month" label="歸屬月份" width="105" align="center" sortable />
+        <el-table-column prop="month" label="進件月份" width="105" align="center" sortable />
         <el-table-column prop="clientName" label="客戶名稱" width="130" show-overflow-tooltip sortable />
         <el-table-column prop="industry" label="產業類別" width="110" show-overflow-tooltip sortable />
         <el-table-column prop="projectName" label="專案名稱" min-width="140" show-overflow-tooltip sortable />
@@ -196,7 +196,7 @@
       <el-form :model="form" :label-position="isMobile ? 'top' : 'left'" label-width="110px">
         <el-row :gutter="16">
           <el-col :xs="24" :sm="12">
-            <el-form-item label="歸屬月份"><el-date-picker v-model="form.month" type="month" value-format="YYYY-MM" style="width: 100%" /></el-form-item>
+            <el-form-item label="進件月份"><el-date-picker v-model="form.month" type="month" value-format="YYYY-MM" style="width: 100%" /></el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12">
             <el-form-item label="客戶屬性">

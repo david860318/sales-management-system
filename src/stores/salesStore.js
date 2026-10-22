@@ -310,10 +310,13 @@ export const useSalesStore = defineStore('sales', {
         const rawTargets = await api.getTargets(this.currentUser.id)
         const targetMap = {}
         rawTargets.forEach(t => {
+          const newClient = Number(t.new_client_target ?? t.new_client ?? 0)
+          const existingClient = Number(t.existing_client_target ?? t.existing_client ?? 0)
+          const total = Number(t.total_target ?? t.total ?? (newClient + existingClient))
           targetMap[t.month] = {
-            total: Number(t.total_target),
-            newClient: Number(t.new_client_target),
-            existingClient: Number(t.existing_client_target)
+            total,
+            newClient,
+            existingClient
           }
         })
         this.targets = targetMap
@@ -327,7 +330,8 @@ export const useSalesStore = defineStore('sales', {
         await api.upsertTarget(this.currentUser.id, month, newTargets)
         this.targets[month] = { ...newTargets }
       } catch (error) {
-        console.error('更新目標失敗', error)
+        console.error('更新目標至資料庫失敗：', error)
+        throw error // 拋出錯誤讓 UI 可以捕獲
       }
     },
 

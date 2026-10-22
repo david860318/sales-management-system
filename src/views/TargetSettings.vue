@@ -28,15 +28,20 @@
         <el-table :data="tableData" border style="width: 100%">
           <el-table-column prop="month" label="月份" width="110" align="center" sortable />
           <el-table-column prop="total" label="總目標業績" align="right" sortable>
-            <template #default="scope">$ {{ scope.row.total.toLocaleString() }}</template>
+            <template #default="scope">
+              <strong>$ {{ scope.row.total.toLocaleString() }}</strong>
+            </template>
           </el-table-column>
           <el-table-column prop="newClient" label="新客目標" align="right" sortable>
-            <template #default="scope"><span style="color: #518de1; font-weight: bold;">$ {{ scope.row.newClient.toLocaleString() }}</span></template>
+            <template #default="scope">
+              <span style="color: #518de1; font-weight: bold;">$ {{ scope.row.newClient.toLocaleString() }}</span>
+            </template>
           </el-table-column>
           <el-table-column prop="existingClient" label="舊客目標" align="right" sortable>
-            <template #default="scope"><span style="color: #4ab382; font-weight: bold;">$ {{ scope.row.existingClient.toLocaleString() }}</span></template>
+            <template #default="scope">
+              <span style="color: #4ab382; font-weight: bold;">$ {{ scope.row.existingClient.toLocaleString() }}</span>
+            </template>
           </el-table-column>
-          <!-- 操作欄：寬度調整為 120，加入防抖動 table-action-group 容器 -->
           <el-table-column label="操作" width="120" align="center">
             <template #default="scope">
               <div class="table-action-group">
@@ -66,15 +71,22 @@
       </div>
     </el-card>
 
-    <!-- 對話框 -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '修改月份業績目標' : '新增月份業績目標'">
-      <el-form :model="form" label-width="110px">
+    <!-- 新增 / 修改對話框 -->
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '修改月份業績目標' : '新增月份業績目標'" width="500px">
+      <el-form :model="form" label-width="115px">
         <el-form-item label="目標月份">
           <el-date-picker v-model="form.month" type="month" value-format="YYYY-MM" :disabled="isEdit" style="width: 100%;" />
         </el-form-item>
-        <el-form-item label="總目標金額"><el-input-number v-model="form.total" :min="0" :step="50000" style="width: 100%;" /></el-form-item>
-        <el-form-item label="新客目標金額"><el-input-number v-model="form.newClient" :min="0" :step="10000" style="width: 100%;" /></el-form-item>
-        <el-form-item label="舊客目標金額"><el-input-number v-model="form.existingClient" :min="0" :step="10000" style="width: 100%;" /></el-form-item>
+        <el-form-item label="新客目標金額">
+          <el-input-number v-model="form.newClient" :min="0" :step="10000" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="舊客目標金額">
+          <el-input-number v-model="form.existingClient" :min="0" :step="10000" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="總目標業績">
+          <el-input-number v-model="form.total" disabled :controls="false" style="width: 100%;" />
+          <div class="auto-calc-hint">💡 由「新客目標」＋「舊客目標」自動加總</div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -85,7 +97,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { useSalesStore } from '../stores/salesStore'
 import { ElMessage } from 'element-plus'
 
@@ -95,32 +107,49 @@ const isEdit = ref(false)
 const filterMonth = ref('')
 const form = reactive({ month: '', total: 0, newClient: 0, existingClient: 0 })
 
+// 核心改動：監聽新客與舊客目標，數值變動時自動加總賦值給 form.total
+watch(
+  [() => form.newClient, () => form.existingClient],
+  ([newVal, existVal]) => {
+    form.total = (Number(newVal) || 0) + (Number(existVal) || 0)
+  }
+)
+
 const tableData = computed(() => {
   let months = Object.keys(salesStore.targets).sort()
   if (filterMonth.value) {
     months = months.filter(m => m === filterMonth.value)
   }
-  return months.map(month => ({
-    month,
-    ...salesStore.targets[month]
-  }))
+  return months.map(month => {
+    const item = salesStore.targets[month] || {}
+    const newClient = Number(item.newClient) || 0
+    const existingClient = Number(item.existingClient) || 0
+    // 保證列表中呈現的總額亦嚴格等於新客 + 舊客
+    const total = Number(item.total) || (newClient + existingClient)
+    return {
+      month,
+      newClient,
+      existingClient,
+      total
+    }
+  })
 })
 
 const openAddDialog = () => {
   isEdit.value = false
   form.month = new Date().toISOString().slice(0, 7)
-  form.total = 500000
   form.newClient = 200000
   form.existingClient = 300000
+  // watch 會自動將 form.total 計算為 500000
   dialogVisible.value = true
 }
 
 const openEditDialog = (row) => {
   isEdit.value = true
   form.month = row.month
-  form.total = row.total
   form.newClient = row.newClient
   form.existingClient = row.existingClient
+  form.total = (Number(row.newClient) || 0) + (Number(row.existingClient) || 0)
   dialogVisible.value = true
 }
 
@@ -133,13 +162,22 @@ const saveTarget = async () => {
     return
   }
 
-  await salesStore.updateTargets(form.month, {
-    total: form.total,
-    newClient: form.newClient,
-    existingClient: form.existingClient
-  })
-  ElMessage.success(`月份 ${form.month} 目標已成功儲存`)
-  dialogVisible.value = false
+  // 確保總目標金額等於 新客目標 + 舊客目標
+  const calculatedTotal = (Number(form.newClient) || 0) + (Number(form.existingClient) || 0)
+  form.total = calculatedTotal
+
+  try {
+    await salesStore.updateTargets(form.month, {
+      total: calculatedTotal,
+      newClient: Number(form.newClient) || 0,
+      existingClient: Number(form.existingClient) || 0
+    })
+
+    ElMessage.success(`月份 ${form.month} 目標已成功儲存！`)
+    dialogVisible.value = false
+  } catch (err) {
+    ElMessage.error('儲存失敗，請檢查網路連線')
+  }
 }
 </script>
 
@@ -162,6 +200,13 @@ const saveTarget = async () => {
   font-weight: bold;
   color: #6b89a8;
   margin-right: 8px;
+}
+
+.auto-calc-hint {
+  font-size: 12px;
+  color: #518de1;
+  margin-top: 4px;
+  line-height: 1.4;
 }
 
 .desktop-target-view { display: block; }

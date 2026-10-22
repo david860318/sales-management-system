@@ -85,21 +85,35 @@ export default {
   },
 
   async upsertTarget(userId, month, targets) {
+    const totalVal = Number(targets.total) || 0
+    const newClientVal = Number(targets.newClient) || 0
+    const existingClientVal = Number(targets.existingClient) || 0
+
+    // 1. 先查詢該 user_id 與 month 是否已經存在
+    const checkRes = await apiClient.get(
+      `/monthly_targets?user_id=eq.${userId}&month=eq.${month}&select=id`
+    )
+    const existingRows = checkRes.data
+
     const payload = {
-      user_id: userId,
-      month: month,
-      total_target: targets.total,
-      new_client_target: targets.newClient,
-      existing_client_target: targets.existingClient
+      total_target: totalVal,
+      new_client_target: newClientVal,
+      existing_client_target: existingClientVal
     }
-    const response = await apiClient.post('/monthly_targets', payload, {
-      headers: { 
-        'apikey': API_KEY,
-        'Authorization': `Bearer ${API_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates,return=representation' 
-      }
-    })
-    return response.data
+
+    if (existingRows && existingRows.length > 0) {
+      // 2. 已存在 -> 依 id 進行 PATCH 更新
+      const targetId = existingRows[0].id
+      const updateRes = await apiClient.patch(`/monthly_targets?id=eq.${targetId}`, payload)
+      return updateRes.data
+    } else {
+      // 3. 不存在 -> 執行標準 POST 新增
+      const createRes = await apiClient.post('/monthly_targets', {
+        user_id: userId,
+        month: month,
+        ...payload
+      })
+      return createRes.data
+    }
   }
 }
